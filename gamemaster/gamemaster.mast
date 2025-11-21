@@ -20,8 +20,8 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     # This is a bit of a work around s the operator doesn't need the pin twice
     default GAMEMASTER_SKIP_PIN = False
 
-    jump full_console if GAMEMASTER_SKIP_PIN
-    jump full_console if GAMEMASTER_CONSOLE_PIN is None or GAMEMASTER_CONSOLE_PIN == ""
+    jump gm_full_console if GAMEMASTER_SKIP_PIN
+    jump gm_full_console if GAMEMASTER_CONSOLE_PIN is None or GAMEMASTER_CONSOLE_PIN == ""
 
 --- login_screen
     gui_section( style=f"area: 20, 40, 80, 40+40px;")
@@ -29,7 +29,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     """Gamemaster pin"""
     _in = gui_input("""desc: Enter pin;password:True;""", var="pin")
     on gui_message(_in):
-        jump full_console if pin == GAMEMASTER_CONSOLE_PIN
+        jump gm_full_console if pin == GAMEMASTER_CONSOLE_PIN
 
     await gui():
         + "cancel":
@@ -38,7 +38,8 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
 
     jump login_screen
 
---- full_console
+=== gm_full_console
+" This label builds the main GM Console screen
     # for testing Side management screen
     # side = "tsn"
     # jump gamemaster_side_relations# {"side": "tsn"}
@@ -66,6 +67,9 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         camera_id = to_id(cambot)
         set_inventory_value(client_id, "GAMEMASTER_COMBOT", camera_id)
         cambot_id = camera_id
+
+        gui_set_variable("gamemaster", client_id)
+        gui_set_variable("gm_ship", camera_id)
 
         # Set up scan sources
         stations_friendly = any_role("__npc__,__player__")
@@ -313,34 +317,36 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         gui_set_variable("gm_selected", agent)
         # shield_count = to_blob(agent).get("shield_count",0)
         print("Adding ship inventory")
-        si = gui_ship_inventory(agent)
-        # gui_set_variable("GM_SHIP_INVENTORY",si) # Just in case we need to access it from elsewhere
+
+        #region Ship Inventory
+        # si = gui_ship_inventory(agent)
+        # # gui_set_variable("GM_SHIP_INVENTORY",si) # Just in case we need to access it from elsewhere
         
         
 
-        add_ship_inventory_item("Energy","energy",True,20,"Status",0)
+        # add_ship_inventory_item("Energy","energy",True,20,"Status",0)
 
-        add_ship_inventory_item("Forward Shields","shield_val",True,10,"Shields",0)
-        add_ship_inventory_item("Aft Shields","shield_val",True,10,"Shields",1)
+        # add_ship_inventory_item("Forward Shields","shield_val",True,10,"Shields",0)
+        # add_ship_inventory_item("Aft Shields","shield_val",True,10,"Shields",1)
         
-        # Now for torpedoes. Theoretically we shoudl be able to dynamically add these
-        add_ship_inventory_item("Homings", "Homing_NUM", True,1,"Torps")
-        add_ship_inventory_item("EMP", "EMP_NUM", True, 1, "Torps")
-        add_ship_inventory_item("Nuke", "Nuke_NUM", True, 1, "Torps")
-        add_ship_inventory_item("Mine", "Mine_NUM", True, 1, "Torps")
-        lb = si.build_list_box()
-        gui_sub_task_schedule(ship_inventory_updates, {"inventory":lb})
+        # # Now for torpedoes. Theoretically we shoudl be able to dynamically add these
+        # add_ship_inventory_item("Homings", "Homing_NUM", True,1,"Torps")
+        # add_ship_inventory_item("EMP", "EMP_NUM", True, 1, "Torps")
+        # add_ship_inventory_item("Nuke", "Nuke_NUM", True, 1, "Torps")
+        # add_ship_inventory_item("Mine", "Mine_NUM", True, 1, "Torps")
+        # lb = si.build_list_box()
+        # gui_sub_task_schedule(ship_inventory_updates, {"inventory":lb})
         
-        on change gui_get_variable("gm_selected"):
-            gms = gui_get_variable("gm_selected")
-            if gms is None or has_role(gms,"gamemaster"):
-                lb.items = []
-            else:
-                si.change_agent(gms)
-                si.rebuild()
-            # print(si.items)
-            si.represent()
-                
+        # on change gui_get_variable("gm_selected"):
+        #     gms = gui_get_variable("gm_selected")
+        #     if gms is None or has_role(gms,"gamemaster"):
+        #         lb.items = []
+        #     else:
+        #         si.change_agent(gms)
+        #         si.rebuild()
+        #     # print(si.items)
+        #     si.represent()
+        #endregion
         
 
 
@@ -532,7 +538,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         back = gui_button("Back")
         on gui_message(back):
             print("Back buttom pressed")
-            jump full_console
+            jump gm_full_console
     await gui()
     ->END
 --- update_side
@@ -750,3 +756,7 @@ ship: None
     for g in gms:
         link(g,"extra_scan_source" ,to_set(SPAWNED_ID))
 
+//comms/gamemaster/selected if has_any_role(COMMS_SELECTED_ID, "ship,station")
+    +[$gamemaster]"Edit":
+        _client = gui_get_variable("gamemaster")
+        gui_reroute_client(_client, gm_ship_edit)

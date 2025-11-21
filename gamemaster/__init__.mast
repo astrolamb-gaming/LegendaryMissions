@@ -2,6 +2,6 @@ import gamemaster.mast
 import gamemaster_controls.py
 import gamemaster_info_panel.py
 import gamemaster.py
-
+import gamemaster_ship_edit.mast
 import move_to_lib.py
 import gamemaster_ship_data_panel.py

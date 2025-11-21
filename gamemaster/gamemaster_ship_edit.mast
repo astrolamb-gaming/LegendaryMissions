@@ -3,7 +3,8 @@
 " Effectively a separate console for the GM to modify a specific ship, particularly player ships.
     print("client:")
     print(client_id)
-    gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT")
+    _client = gui_get_variable("gamemaster")
+    gm = get_inventory_value(_client, "GAMEMASTER_COMBOT")
     print("GM:")
     print(gm)
     ship = get_inventory_value(gm, "gamemaster_prev_selection")
@@ -14,7 +15,7 @@
         # If the ship is None, then we just stay on the main GM screen.
         print("Ship is NONE")
         yield fail
-    sbs.assign_client_to_ship(client_id, ship.id)
+    sbs.assign_client_to_ship(_client, ship.id)
     gui_section("area: 0,0,100,100")
     with gui_sub_section("area: 0,0,20,30"):
         # stuff
