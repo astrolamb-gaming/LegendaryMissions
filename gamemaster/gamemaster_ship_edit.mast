@@ -34,7 +34,8 @@
 
     with gui_sub_section("area: 20,0,100,100"):
         gui_layout_widget("ship_internal_view")
-        gui_layout_widget("comms_control")
+        # gui_layout_widget("comms_control")
+        gui_layout_widget("grid_control")
     with gui_sub_section("area: 95,0,100,5"):
         close = gui_button("text:X; font:gui-3;")
         on gui_message(close):
@@ -43,8 +44,25 @@
     await gui()
 
 //comms/grid if has_role(COMMS_ORIGIN_ID,"__player__")
-    if get_dedicated_link(client_id, "gm") is not None:
-        +"Repair Damage"
-        +"Damage System"
-        +"Damcons Refresh"
+
+    # origin = ship
+    # selected = grid agent
+
+    print("Gui comms:")
+    print(gui_get_variable("gamemaster"))
+    # if gui_get_variable("gamemaster") is not None:
+    print(f"client ID {EVENT.client_id}") # 0
+    print(f"Parent ID {EVENT.parent_id}") # 0
+    print(f"Origin ID {EVENT.origin_id}")
+    print(f"Selected ID {EVENT.selected_id}")
+    print(f"Tag {EVENT.tag}") # ""
+    print(f"Sub Tag {EVENT.sub_tag}") # grid_selected_UID
+    # print(f"Sub Float {EVENT.sub_float}") 
+    print(f"Value Tag {EVENT.value_tag}") # grid_object_list
+    print(f"Extra Tag {EVENT.extra_tag}") # ""
+    print(f"Extra Extra Tag {EVENT.extra_extra_tag}") # ""
+    print(f"Point {EVENT.source_point.x}  {EVENT.source_point.y} {EVENT.source_point.z}") # 0 0 0
+    +"Repair Damage"
+    +"Damage System"
+    +"Damcons Refresh"
 
