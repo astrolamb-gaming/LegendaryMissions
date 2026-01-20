@@ -1,7 +1,15 @@
 if is_dev_build():
     gui_tab_add_top("quest")
+    # Example images
+    gui_image_add_atlas("test", "media/LegendaryMissions/operator")
+    gui_image_add_atlas("test2", "media/LegendaryMissions/operator", 645,570, 950,820)
 
-//gui/tab/quest if is_dev_build()
+default CONSOLE_SELECT = "" # Make sure variable exist at startup
+
+if is_dev_build():
+    quest_console_enable("helm,comms")
+
+//gui/tab/quest if quest_is_console_enabled(CONSOLE_SELECT)
     jump quest_screen
 
 
@@ -27,12 +35,14 @@ $t Select a quest
 
 
 """
-    with gui_sub_section("col-width:65;padding:20px,0, 0,0"):
+    #"col-width:62-25px;padding:10px,0, 0,0"):
+    with gui_sub_section(): 
+        gui_row("col-width:62-25px;padding:10px,0, 0,0")
         text = gui_text_area(t) #"$h1 Hello\n\nTest\n\n\n\n")
 
     header = """
 =$t font:gui-6;color:#bbb;
-=$h1 font:gui-5;color:#55b; | I > 0;
+=$h1 font:gui-5;color:#55b;background:#115; | I > 0;
 =$h2 font:gui-4;color:#5b5; | A > 2;
 =$h3 font:gui-3;color:#b55; | a > 4;
 =$p2 font:gui-2;color:#11f; | > 2;
@@ -49,6 +59,8 @@ $t Select a quest
     obj_list.title_section_style += "background:#1578;"
     on change obj_list.get_value():
         item = obj_list.get_value()
+        if gui_list_box_is_header(item):
+            item = item.data
 
         t = """
 $t {item.display_text}
