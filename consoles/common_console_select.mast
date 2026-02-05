@@ -6,11 +6,18 @@ default SETTINGS = settings_get_defaults()
 shared SHIP_PICK_READ_ONLY  = SETTINGS.get("SHIP_PICK_READ_ONLY", False)
 shared CAN_CHANGE_CONSOLE  = SETTINGS.get("CAN_CHANGE_CONSOLE", True)
 
+### TAB CONSOLES ARE A WORK IN PROGRESS
+### NOT A RECOMMEND PATH AT THIS TIME
+### IT WILL CHANGE BASED ON OTHER FEATURES PLANNED
+shared TAB_CONSOLES = gui_tab_get_list() 
+# Remember these also need a //gui/tab to work
+shared TAB_CONSOLES_ENABLE = SETTINGS.get("ALLOW_CONSOLE_TABS", False)
+
+
 if CAN_CHANGE_CONSOLE:
     route_change_console(on_change_console)
 
 ==== on_change_console
-
     jump select_console if not GAME_ENDED
     ->END
 
@@ -22,6 +29,13 @@ if CAN_CHANGE_CONSOLE:
 #
 
 ========= client_main ==========
+    # Assure the tab enabled variables object_exists
+    # But don't overwrite ones set
+    for con_tab in TAB_CONSOLES:
+        con_tab = con_tab.upper()
+        v = get_variable(f"{con_tab}_TAB_ENABLED", False)
+        set_variable(f"{con_tab}_TAB_ENABLED", v)
+
     consoles = gui_get_console_type_list()
     console_select_item = consoles[0]
     CONSOLE_SELECT = consoles[0].path
@@ -129,6 +143,7 @@ if CAN_CHANGE_CONSOLE:
 
     if len(PLAYER_LIST) >0:
         ship_type_def = PLAYER_LIST[client_selected_index].art_id
+        ship_type = ship_type_def
         ship_name = PLAYER_LIST[client_selected_index].name
         client_select_ship = ship_name.lower()
 
@@ -171,7 +186,7 @@ if CAN_CHANGE_CONSOLE:
         spick.read_only = True
     elif console_select_item.path == "helm" and not GAME_STARTED:
         gui_show(ship_sec_not)
-        spick.read_only = False
+        spick.read_only = not SHIP_PICK_READ_ONLY
         
     #
     # List of available ships
@@ -204,9 +219,10 @@ if CAN_CHANGE_CONSOLE:
     #
     # Ready state
     #
+    default cb_ready = None
     gui_section( style="area: 80,100-60px, 99,100;row-height: 50px;")
-    if not GAME_STARTED and not console_ready:
-        gui_checkbox("ready", var="console_ready")
+    if not GAME_STARTED:
+        cb_ready = gui_checkbox("ready", var="console_ready")
     else:
         on gui_message(gui_button("ready")):
             console_ready = True
@@ -234,10 +250,14 @@ if CAN_CHANGE_CONSOLE:
         #
         console_select_item = console_select_lb.get_value()
         CONSOLE_SELECT = console_select_item.path
+        if not GAME_STARTED:
+            console_ready = False
+            cb_ready.value = False
+            gui_represent(cb_ready)
         if console_select_item.path == "helm" and not GAME_STARTED:
             gui_show(ship_sec)
             gui_hide(ship_sec_not)
-            spick.read_only = False
+            spick.read_only =not SHIP_PICK_READ_ONLY
             gui_represent(ship_sec2)
         elif OPERATOR_MODE_enabled and console_select_item.path == "admin":
             console_ready = True
@@ -362,6 +382,28 @@ if CAN_CHANGE_CONSOLE:
     sbs.set_client_string(client_id, "crew_name", crew_name)
     set_inventory_value(client_id, "CREW_NAME", crew_name)
 
+    #
+    #
+    #
+    # gui_tab_clear_top()
+    if TAB_CONSOLES_ENABLE:
+        tab = CONSOLE_SELECT.upper()
+        tabs = tab
+        # Force the selected console to now be enabled
+        set_variable(f"{tab}_TAB_ENABLED", True)
+        rem_tabs = ""
+        for con_tab in TAB_CONSOLES:
+            con_tab = con_tab.upper()
+            if get_variable(f"{con_tab}_TAB_ENABLED"):
+                tabs = con_tab + "," + tabs
+            else:
+                rem_tabs = con_tab + "," + rem_tabs
+        gui_tab_add_top(tabs)
+        
+        gui_tab_remove_top(rem_tabs)
+
+
+
     # Retrieve the item by string (because might have navigator here via tab)
     console = gui_get_console_type(CONSOLE_SELECT)
     if console is not None:
@@ -442,4 +484,8 @@ $t on ship {client_select_ship}
 
 //gui/tab/weapons
     CONSOLE_SELECT= "weapons"
+    jump console_selected 
+
+//gui/tab/hangar
+    CONSOLE_SELECT= "hangar"
     jump console_selected 
