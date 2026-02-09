@@ -1,14 +1,29 @@
-from sbs_utils.procedural.gui import gui_row, gui_text, gui_ship, gui_sub_section, gui_checkbox, gui_message_callback, gui_represent, gui_task_for_client, gui_icon
+from sbs_utils.procedural.gui import gui_row, gui_text, gui_ship, gui_sub_section, gui_checkbox, gui_task_for_client, gui_icon, gui_blank
 from sbs_utils import fs
 from sbs_utils.procedural import ship_data
 from sbs_utils.helpers import FrameContext
 from sbs_utils.procedural.gui import gui_tab_get_list
 
 def console_select_template(item, **kwargs):
-    gui_row("row-height: 1.2em;padding:13px;")
-    gui_text(f"$text:{item.display_name};justify: left;font:gui-3;")
-    gui_row("row-height: 1.2em;padding:13px;")
-    gui_text(f"$text:{item.description};justify: left;font:gui-2;color:#bbb;")
+    gui_row("row-height: 2.5em;")
+    sec = kwargs.get("section")
+    # Too coupled for now just  test
+    click_color = "#fff1"
+    if sec:
+        sec.click_text = None
+        sec.click_tag = None
+        click_color = sec.click_background
+
+    con = gui_sub_section()
+    with con:
+        gui_row("row-height: 1.2em;padding:13px;")
+        gui_text(f"$text:{item.display_name};justify: left;font:gui-3;")
+        gui_row("row-height: 1.2em;padding:13px;")
+        gui_text(f"$text:{item.description};justify: left;font:gui-2;color:#bbb;")
+
+    con.sub_section.click_tag = kwargs.get("click_tag")
+    con.sub_section.click_text = ""
+    con.sub_section.click_background = click_color
 
     if not FrameContext.client_task.get_variable("TAB_CONSOLES_ENABLE", False):
         return
@@ -20,22 +35,7 @@ def console_select_template(item, **kwargs):
             cb = gui_icon(f"icon_index: 101;color:white;")
         else:
             cb = gui_checkbox(f"icon_index: 101;color:white;", var=f"{console}_TAB_ENABLED")
-            listbox = kwargs.get("section")
-            cb._lb = listbox
-            cb._console = console
-            gui_message_callback(cb, console_click_cb)
-        
-def console_click_cb(event, item):
-    # Need to represent the whole listbox
-    # Because the engine doesn't allow repainting
-    # individual items that are in a sub region
-    # and that just is silly
-    gui_represent(item._lb)
-    
-
-   
-    
-
+            
     
 
 def console_select_title_template():
@@ -44,7 +44,7 @@ def console_select_title_template():
     
 
 def console_ship_select_template(item):
-    gui_row("row-height:3em;padding:13px;")
+    gui_row("row-height:2.5em;padding:13px;")
     gui_ship(f"{item.art_id}", style="col-width:50px;padding:0,0,5px,0;")
     dat = ship_data.get_ship_data_for(item.art_id)
     desc = "A fine ship"
@@ -57,8 +57,9 @@ def console_ship_select_template(item):
             desc = f"{desc}"
 
     with gui_sub_section():
+        gui_row("row-height:1.2em;")
         gui_text(f"$text:{item.name} - {item.side};justify: left;font:gui-3;")
-        gui_row()
+        gui_row("row-height:1em;")
         gui_text(f"$text:{desc};justify: left;font:gui-2;color:#bbb;")
     # gui_text(f"$text:Hello;justify: left;font:gui-2;")
     
@@ -115,3 +116,65 @@ def console_comms_swap_panels(cid,left,top,width,height, water):
 
 def console_tab_toggle():
     pass
+
+
+
+def comms_recent_sort(items):
+    return sorted(items, key=lambda cm: cm.get("time"))
+
+from sbs_utils.procedural.gui import gui_face
+def comms_recent_item(item):
+
+    gui_row("row-height:2em")
+
+    gui_face(f"{item.face}")
+    # Is storing the face expensive to memory
+    with gui_sub_section():
+        gui_row("row-height:1em")
+        title = item.title
+        title_color = item.title_color
+        msg = item.message
+        msg = msg[:20] + ".."
+        msg_color = item.message_color
+        title = f"$text:{title};font:gui-2;color:{title_color};"
+        msg = f"$text:{msg};font:gui-1;color:{msg_color};"
+        
+        gui_text(title)
+        gui_row()
+        gui_text(msg)
+
+        
+
+        
+
+def comms_message_item(item):
+    gui_row("row-height:2em")
+
+    if item.receive:
+        gui_face(f"{item.face}")
+    else:
+        gui_blank(1,"col-width:2em")
+    # Is storing the face expensive to memory
+    with gui_sub_section():
+        gui_row("row-height:1em")
+        title = item.title
+        title_color = item.title_color
+        msg = item.message
+
+        msg_color = item.message_color
+        title = f"$text:{title};font:gui-2;color:{title_color};"
+        msg = f"$text:{msg};font:gui-1;;color:{msg_color};"
+
+        if not item.receive:
+            title += "justify:right;"
+            msg += "justify:right;"
+        
+        gui_text(title)
+        gui_row()
+        gui_text(msg)
+
+    if not item.receive:
+        gui_face(f"{item.face}")
+    else:
+        gui_blank(1,"col-width:2em")
+    
