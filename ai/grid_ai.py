@@ -188,3 +188,52 @@ def grid_damcons_handle_idling_boost_finish(id_or_obj):
         grid_short_status(_go_id, "I ate good.", "blue", seconds=3)
         set_inventory_value(_go_id, "fed_speed_coeff", 1.25)
         set_timer(_go_id, "fed_speed_coeff", minutes=random.randint(10,16))
+
+
+
+
+def grid_damcons_detailed_status_update(id_or_obj, short_status=None, short_color=None, seconds=None):
+    _go_id = to_id(id_or_obj)
+
+    if short_color == None: short_color = get_inventory_value(_go_id, "last_status_color", "idle")
+    if short_status is not None and seconds is not None: 
+        grid_short_status(_go_id, short_status, short_color, seconds)
+        set_inventory_value(_go_id, "last_status", short_status)
+        set_inventory_value(_go_id, "last_status_color", short_color)
+
+    short_status = get_inventory_value(_go_id, "last_status", "idle")
+
+    work = linked_to(_go_id, "work-order")
+    color = get_inventory_value(_go_id, "color", "white")
+    work_count = len(work)
+    hp = get_inventory_value(_go_id, "HP", 1)
+    if hp < 6:
+        hp = f"{hp} HP visit sickbay"
+    else:
+        hp = f"{hp} HP"
+        
+    health_status = f"{hp}"
+
+    # This should be less Hard coded
+    speed_modifiers = get_inventory_value(_go_id, f"speed_modifiers", {})
+    new_speed_modifiers = {}
+    for k,speed_up in speed_modifiers.items():
+        #print(f"{k}")
+        if speed_up is not None and not speed_up.expired():
+            left = speed_up.format_time_remaining()
+            status = f"{k} for {left}"
+            health_status += "^" + status
+            new_speed_modifiers[k]=speed_up
+    set_inventory_value(_go_id, f"speed_modifiers", new_speed_modifiers)
+    
+    work_item_status = f"{work_count} work items"
+
+    boost_time = get_time_remaining(_go_id, "idle_boost_timer")
+    boost = "for boost idle in gym,mess, or quarters"
+    if boost_time > 0:
+        boost_time = format_time_remaining(_go_id, "idle_boost_timer")
+        boost = f"boost in {boost_time}"
+
+        
+    detailed_status = f"{short_status}^{work_item_status}^{health_status}^{boost}"
+    grid_detailed_status(_go_id, detailed_status, color)
