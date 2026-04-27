@@ -19,7 +19,7 @@
     gui_text("$text:BUY THIS GAME;font:gui-6;justify:right;")
 
     # """ Show a Logo and say waiting for game to start """
-    gui_section( style=f"area: 0, 0, 100, 76;")
+    gui_section( style=f"area: 0, 48px, 100, 76;")
     gui_image_keep_aspect_ratio_center(get_mission_dir_filename("media/LegendaryMissions/operator"))
 
 
