@@ -113,7 +113,7 @@ gui_reroute_clients("client_main")
     if mission_overview is not None:
         START_TEXT = """$t {mission_overview.display_name}:\n\n{mission_overview.desc}"""
 
-    gui_section( style="area: 20px, 20px, 100, 210px;margin:0,0,10px,0;padding:10px,0;background:#1578;")
+    gui_section( style="area: 20px, 50px, 100, 210px;margin:0,0,10px,0;padding:10px,0;background:#1578;")
     gui_text_area(START_TEXT)
 
     # For using a seed value when randomly generating terrain, not currently implemented
