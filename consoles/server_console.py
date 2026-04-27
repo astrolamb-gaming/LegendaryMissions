@@ -10,7 +10,7 @@ def main_mission_select_template(item):
     
     
 
-def main_mission_select_title_template():
-    gui_row("row-height: 1.2em;padding:13px;background:#1578;")
-    gui_text(f"$text:Mission types;justify: left;")
+# def main_mission_select_title_template():
+#     gui_row("row-height: 1.2em;padding:13px;background:#1578;")
+#     gui_text(f"$text:{MISSIONS_TITLE};justify: left;")
     
