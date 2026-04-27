@@ -126,7 +126,10 @@ gui_reroute_clients("client_main")
 
     gui_section(style="area: 0, 95-500px, 100, 95;")
     l = len(mission_list)
-    MISSIONS_TITLE = "Select a mission. {l} types."
+    if l >1:
+        MISSIONS_TITLE = "Select a mission. {l} types."
+    else:
+        MISSIONS_TITLE = "Mission"
     mission_picker = gui_list_box(mission_list,"row-height: 7em; background:#1578;", item_template=main_mission_select_template, title_template=MISSIONS_TITLE, select=True, carousel=True)
     # Initialize the selection to account for if we already have one
     mission_picker.set_selected_index(mission_index)
