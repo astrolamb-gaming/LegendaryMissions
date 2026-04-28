@@ -103,7 +103,7 @@
             "transmit": "The High Priests must be desperate to put scum like you in a uniform. Stolen anything lately?",
             "failure": "You have confused Kraliens with someone else, {name}. Go bother someone else.",
             "success": "Kraliens not afraid to get blood on uniform, {name}. Kraliens will start with your blood!",
-            "science": "The captain is a former pirate, and may be trying to clean up their repuation by buying a commission."
+            "science": "The captain is a former pirate, and may be trying to clean up their reputation by buying a commission."
         },
         {
             "button": "Taunt safety record",
@@ -291,7 +291,7 @@
             "transmit": "Hey Skaraan! Your ship is so slow it leaves a slime trail!",
             "failure": "So does your maternal progenitor, {name}. Now watch my slow ship kill a bunch of worthless clodpoles.",
             "success": "I have the fastest ship in the galaxy, {name}. And it's about to blow you to smithereens!",
-            "science": "The captain frequently brags that his ship is the fastest in the galaxy."
+            "science": "The captain frequently brags that their ship is the fastest in the galaxy."
         },
         {
             "button": "Taunt captain's investment portfolio",
@@ -363,7 +363,7 @@
             "transmit": "Your father is so stupid he thinks planets are tiny plans.",
             "failure": "And you are stupid for believing I would react to that, {name}!",
             "success": "My father is a genius, {name}! For insulting him you shall die!",
-            "science": "The captain is proud that his father is a famous scientific genius."
+            "science": "The captain is proud that their father is a famous scientific genius."
         },
         {
             "button": "Taunt captain's xim",
@@ -377,7 +377,7 @@
             "transmit": "You wouldn’t dare fight me, you cowering Lepusian mud mouse!",
             "failure": "I'll get around to fighting you eventually, {name}. Right now I have more important concerns.",
             "success": "I have ten times your courage, {name}! And I am coming to kill you!",
-            "science": "One of our agents has reported that the captain is inexperienced and insecure about his own courage."
+            "science": "One of our agents has reported that the captain is inexperienced and insecure about their own courage."
         },
         {
             "button": "Taunt captain's carousing",
@@ -442,14 +442,14 @@
             "transmit": "Hey loud-mouth! It's easy to brag about your reputation when you've never been in a real fight!",
             "failure": "You are not worth the effort, {name}. Go annoy someone else.",
             "success": "After I destroy your ship, I can brag about it as much as I want, {name}!",
-            "science": "The captain was recently overheard bragging about his spotless reputation in a space-bar."
+            "science": "The captain was recently overheard bragging about their spotless reputation in a space-bar."
         },
         {
             "button": "Taunt captain's bravery",
             "transmit": "Hey yellow-belly! We're surprised to see you, but maybe you're running away from a bigger battle?",
             "failure": "We're right where we need to be, {name}. We've got better things to do than listen to you.",
             "success": "We're not going anywhere, {name}. Prepare to be destroyed!",
-            "science": "The captain was criticized at his last review board for being too cautious and retreating too early."
+            "science": "The captain was criticized at their last review board for being too cautious and retreating too early."
         },
         {
             "button": "Taunt intelligence",
