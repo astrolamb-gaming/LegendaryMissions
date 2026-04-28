@@ -1,7 +1,7 @@
 {
     "kralien": [
         {
-            "button": "Taunt ship's condition",
+            "button": "Taunt ship's battle damage",
             "transmit": "You call that a ship? Where I come from that’s a rusting bucket of table scraps!",
             "failure": "Your ship is rustier and also very stupid, {name}.",
             "success": "Rust you say? Prepare to meet the gods, sniveling infidels!",
@@ -15,11 +15,11 @@
             "science": "The captain is vain and proud of their handsome face."
         },
         {
-            "button": "Taunt religion",
+            "button": "Taunt religious devotion",
             "transmit": "Hey worm-face! I'm using your Holy Scrolls to wipe my stinky feet!",
             "failure": "You can stick those superstitions up your excrement orifice, {name}.",
             "success": "For your blasphemy you shall immediately die!",
-            "science": "The captain is zealously devout to the Kralien religion."
+            "science": "The captain is a hardshell fundamentalist and zealously devoted to the Kralien religion."
         },
         {
             "button": "Taunt rent collection",
@@ -29,7 +29,7 @@
             "science": "The captain believes they are the best rent collectors in the fleet."
         },
         {
-            "button": "Taunt reputation",
+            "button": "Taunt spotless reputation",
             "transmit": "Hey wide-mouth! It's easy to puff up your reputation when you always run from a real fight!",
             "failure": "You are not worth the effort, {name}. Go annoy someone else.",
             "success": "Your pathetic ship will be obliterated, {name}!",
@@ -37,7 +37,7 @@
         },
         {
             "button": "Taunt bravery",
-            "transmit": "Hey rodent-face! If you skitter away like a frightened hatchling, do you have to give that shiny medal back?",
+            "transmit": "Hey grub-face! If you skitter away like a frightened hatchling, do you have to give that shiny medal back?",
             "failure": "Fools will not be heard, {name}. Cease all communication.",
             "success": "Insolence will not be tolerated, {name}. Prepare for death!",
             "science": "The captain was recently awarded a commendation for bravery by the High Priest Council."
@@ -71,7 +71,7 @@
             "science": "The captain is young and inexperienced. They may be over-eager to prove themselves in battle."
         },
         {
-            "button": "Taunt captain's age",
+            "button": "Taunt captain's older age",
             "transmit": "Did they brush the dirt off after dragging you out from under a rock? Are you really up for this, old-timer?",
             "failure": "Wise Terran once told Kraliens, age and treachery triumph over youth and attractiveness.",
             "success": "Kraliens will teach insolent hatchlings to respect elders. Prepare for painful lessons, {name}!",
@@ -103,7 +103,7 @@
             "transmit": "The High Priests must be desperate to put scum like you in a uniform. Stolen anything lately?",
             "failure": "You have confused Kraliens with someone else, {name}. Go bother someone else.",
             "success": "Kraliens not afraid to get blood on uniform, {name}. Kraliens will start with your blood!",
-            "science": "The captain is a former pirate, and may be trying to clean up their repuation by enlisting."
+            "science": "The captain is a former pirate, and may be trying to clean up their repuation by buying a commission."
         },
         {
             "button": "Taunt safety record",
@@ -120,7 +120,7 @@
             "science": "The captain has a bad gambling habit, and a long history of not paying off their debts."
         },
         {
-            "button": "Taunt religious background",
+            "button": "Taunt former priesthood",
             "transmit": "Hey, altar-bug! We heard you weren't moral enough for the priesthood. Good thing the military has no standards!",
             "failure": "Kralien religion teaches forgiveness, so {name} is forgiven for being stupid. Enjoy your shame in silence.",
             "success": "Insolent infidels! The wages of sin will be repaid only with agony and death!",
@@ -134,7 +134,7 @@
             "science": "A double-agent reported the captain has been studying the blasphemous Cult of Zulkazor."
         },
         {
-            "button": "Taunt captain's finances",
+            "button": "Taunt skimming rent collections",
             "transmit": "Hey, slime-bucket! What happens when you steal from the High Priests? Do they still chop off a thumb?",
             "failure": "Kraliens give extra money to homeless orphans, {name}. Do not bother Kraliens again.",
             "success": "Your heads are full of excrement, {name}. Kraliens will destroy your pathetic ship!",
@@ -257,7 +257,7 @@
             "science": "The captain surrendered a Behemoth-class dreadnought to a pirate scout at the Battle of Polaris Wharf."
         },
         {
-            "button": "Taunt captain's apetite",
+            "button": "Taunt captain's appetite",
             "transmit": "Hey grass-eater! We've got a delicious fruit salad over here, it would look great on your trophy wall!",
             "failure": "An amusing joke, but we have no use for humor. Enjoy your fruit salad, {name}.",
             "success": "I will display this fruit salad right next to your skulls, {name}. Prepare to die!",
@@ -287,14 +287,14 @@
 ],
     "skaraan": [
         {
-            "button": "Taunt ship is slow",
+            "button": "Taunt ship's speed",
             "transmit": "Hey Skaraan! Your ship is so slow it leaves a slime trail!",
             "failure": "So does your maternal progenitor, {name}. Now watch my slow ship kill a bunch of worthless clodpoles.",
             "success": "I have the fastest ship in the galaxy, {name}. And it's about to blow you to smithereens!",
-            "science": "The captain is proud to command the fastest ship in the galaxy."
+            "science": "The captain frequently brags that his ship is the fastest in the galaxy."
         },
         {
-            "button": "Taunt captain's finances",
+            "button": "Taunt captain's investment portfolio",
             "transmit": "You penniless pauper! Your portfolio sucks like a black hole!",
             "failure": "I won't even dignify your worthless crew and squalid ship with a reaction, {name}.",
             "success": "How dare you insult my finances, {name}? I shall enjoy earning the bonus for killing you!",
@@ -336,7 +336,7 @@
             "science": "The captain lost their tail during the Battle of Lyra 6, and spent three months regrowing a new one."
         },
         {
-            "button": "Taunt captain's reputation",
+            "button": "Taunt false battle reports",
             "transmit": "Hey snot-ball! Are you really here to fight, or will you just run away and file another fake report?",
             "failure": "I assure you, all our paperwork is in order, {name}. No further communication.",
             "success": "Nothing will give me greater satisfaction than reporting on your untimely demise, {name}!",
@@ -354,7 +354,7 @@
             "transmit": "Hey snot-brain! I bet you're so dumb, you file your taxes with a tail-rasp!",
             "failure": "We have no interest in your attempts at humor, {name}. End communications.",
             "success": "How dare you, {name}! You will not find it so funny when we destroy you!",
-            "science": "The captain has been recongized for his financial skills, but is not regarded as a particularly smart tactician."
+            "science": "The captain has reliable financial skills, but is not considered particularly smart or creative by their peers."
         }  
 ],
     "ximni": [
@@ -375,7 +375,7 @@
         {
             "button": "Taunt captain's courage",
             "transmit": "You wouldn’t dare fight me, you cowering Lepusian mud mouse!",
-            "failure": "I'll get around to fighting you eventually, {name}. Right now I have other enemies to defeat.",
+            "failure": "I'll get around to fighting you eventually, {name}. Right now I have more important concerns.",
             "success": "I have ten times your courage, {name}! And I am coming to kill you!",
             "science": "One of our agents has reported that the captain is inexperienced and insecure about his own courage."
         },
@@ -398,7 +398,7 @@
             "transmit": "Hey, fenol-harkelag! We heard you singing earlier, and it was so abom we almost surrendered!",
             "failure": "You're the one with the annoying voice, {name}. We will no longer listen to it.",
             "success": "We will sing about our glorious victory after we annihilate you, {name}. Too bad you won't be around to hear it!",
-            "science": "The captain is proud of his singing voice, but is considered by shipmates to be more enthusiastic than talented."
+            "science": "The captain is proud of their singing voice, but is considered by shipmates to be more enthusiastic than talented."
         },
         {
             "button": "Taunt captain's clan",
@@ -428,6 +428,77 @@
             "success": "Your concern about our ammunition is noted, {name}. You will be more intimately familiar with it shortly!",
             "science": "The captain's ex-lover told one of our agents that they are infertile and lousy in the sack."
         }
+],
+    "tsn": [
+        {
+            "button": "Taunt captain's old age",
+            "transmit": "Hey, you wrinkled old prune! Are you sure you should be on the bridge during your naptime?",
+            "failure": "Old age and treachery always beats youth and skill, {name}. I'm too old to fall for that.",
+            "success": "Death comes to us all, {name}. I would be happy to deliver yours earlier than expected!",
+            "science": "The captain is 4 years past the recommended retirement age for TSN senior officers."
+        },
+        {
+            "button": "Taunt reputation",
+            "transmit": "Hey loud-mouth! It's easy to brag about your reputation when you've never been in a real fight!",
+            "failure": "You are not worth the effort, {name}. Go annoy someone else.",
+            "success": "After I destroy your ship, I can brag about it as much as I want, {name}!",
+            "science": "The captain was recently overheard bragging about his spotless reputation in a space-bar."
+        },
+        {
+            "button": "Taunt captain's bravery",
+            "transmit": "Hey yellow-belly! We're surprised to see you, but maybe you're running away from a bigger battle?",
+            "failure": "We're right where we need to be, {name}. We've got better things to do than listen to you.",
+            "success": "We're not going anywhere, {name}. Prepare to be destroyed!",
+            "science": "The captain was criticized at his last review board for being too cautious and retreating too early."
+        },
+        {
+            "button": "Taunt intelligence",
+            "transmit": "Hey pea-brain! You're so stupid, we heard you flunked your last urine test!",
+            "failure": "I may be dumb, but I'm smart enough to ingore this obvious taunt, {name}. Get lost.",
+            "success": "Let's see if you can out-think being dead, {name}. Prepare to die!",
+            "science": "The captain was almost kicked out of the TSN Academy for failing too many classes."
+        },
+        {
+            "button": "Taunt spouse",
+            "transmit": "You're so pathetic, I bet your spouse hopes you come home in a coffin!",
+            "failure": "I'm not married, you idiot. Go bother someone else, {name}.",
+            "success": "My husband and I will enjoy a glass of wine after you're dead, {name}. Prepare to die!",
+            "science": "The captain and their spouse have a very stable, loving relationship."
+        },
+        {
+            "button": "Taunt slow speed",
+            "transmit": "That rickety scrap-heap is so slow, it's red-shifting off my radar!",
+            "failure": "We're not in a hurry, {name}. Go waste someone else's time.",
+            "success": "If you want to die faster, {name}, then we can certainly oblige you!",
+            "science": "At the last refit, maintenance records show that the captain complained about the ship's lack of speed."
+        },
+        {
+            "button": "Taunt captain's appearance",
+            "transmit": "Hey, puke-face! If I was that ugly, my cat would try to bury me in a sandbox!",
+            "failure": "Appearances can be deceiveing, {name}. You appear to think I am listening to you, but I am not.",
+            "success": "When I am done with your ship, {name}, there won't be enough left to bury!",
+            "science": "The captain spends a considerable portion of their salary on skin treatments and hair stylists."
+        },
+        {
+            "button": "Taunt captain's drinking",
+            "transmit": "Hey, booze-brain! If you're seeing too many targets, fire in the middle of them. Maybe you'll get lucky!",
+            "failure": "I'm enjoying a nice cup of coffee, {name}. Do toodle off and bother someone else.",
+            "success": "I will be the first to toast your stupidity at your funeral, {name}. Bottoms up!",
+            "science": "The captain drinks alcohol like a fish... the legendary tryannomaw icthyokaiju of Rigel IV, to be exact."
+        },
+	{
+            "button": "Taunt captain's inexperience",
+            "transmit": "Hey, lickspittle! Did they give you a ship to play soldier with? Better not break it!",
+            "failure": "I'm not an idiot, {name}. I won't fall for these infantile insults.",
+            "success": "I would be delighted to put up {name} as my first kill-marker. Prepare to be destroyed!",
+            "science": "The captain is fresh out of the Academy and has no notable battle experience."
+        },
+	{
+            "button": "Taunt ship's appearance",
+            "transmit": "Hey slop-bucket! I guess there's no point in cleaning up if you're just going to get blown to pieces!",
+            "failure": "Nice try, {name}. We won't be baited that easily.",
+            "success": "The only mess we need to clean up is wiping you off the battlefield, {name}! Prepare to die!",
+            "science": "The captain's crew was recently reprimanded for sloppy repairs and failure to maintain battle-ready appearance."        }
 ],
     "unknown": [{
         "button": "",
