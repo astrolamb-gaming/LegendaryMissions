@@ -22,7 +22,7 @@
 "
 "        player_ship_roles (str, optional): A comma-separated string of roles that should get this torpedo.
 "        energy_conversion_value (int, optional): The amount of energy to provide to the ship by disassembling the torpedo. Default is 100.
-"        build_speeds (dict, optional): A dictionary of (str, int) representing the station type and the rate of production.
+"        build_times (dict, optional): A dictionary of (str, int) representing the station type and the rate of production.
 "        on_hit (label, optional): The label to run when the torpedo hits.
 metadata: ```
 key: Homing
@@ -40,7 +40,7 @@ behavior: homing
 energy_conversion_value: 100
 default_max_count: 10
 player_ship_roles: __player__
-build_speeds:
+build_times:
     industry: 3
     default: 1
 ```
@@ -64,7 +64,7 @@ build_speeds:
     default energy_conversion_value = 100
     default default_max_count = 10
     default player_ship_roles = "__player__"
-    default build_speeds = {"default": 3, "industry": 1}
+    default build_times = {"default": 3, "industry": 1}
 
     ~~ torpedo_type(key=key, 
         gui_text=gui_name, 
@@ -94,9 +94,36 @@ build_speeds:
             torpedo_make_available(ship, key, _max)
 
     # I think this isn't necessary
-    # set_inventory_value(id, "station_build_speeds", build_speeds)
+    # set_inventory_value(id, "station_build_times", build_times)
 
     yield result id
+
+//spawn if has_role(SPAWNED_ID, "station")
+    await delay_sim(1)
+    s = SPAWNED_ID
+    jump set_station_torpedo_production_speeds
+
+=== set_station_torpedo_production_speeds
+    if s is None:
+        ->END
+    so = to_object(s)
+    if so is None:
+        ->END
+    artid = so.art_id
+    torps = role("torpedo_definition")
+    torp_keys = []
+    for tr in torps:
+        key = get_inventory_value(tr, "key")
+        torp_keys.append(key)
+        times = get_inventory_value(tr, "build_times")
+        for station_type in times:
+            if station_type in artid:
+                time = times[station_type]
+                set_inventory_value(s, f"{key}_BUILD_SPEED", time)
+                break
+    # @inventory torpedo_production_keys A list of all the keys of torpedoes this station could produce
+    set_inventory_value(s, "torpedo_production_keys", torp_keys)
+    ->END
 
 # Here we handle spawning of ships, and giving them torps as determined by the torpedo's definitions.
 //spawn if has_role(SPAWNED_ID, "__player__")
@@ -146,7 +173,7 @@ behavior: homing
 energy_conversion_value: 100
 default_max_count: 10
 player_ship_roles: tsn
-build_speeds:
+build_times:
     command: 2
     civil: 6
     industry: 1
@@ -172,7 +199,7 @@ behavior: homing
 energy_conversion_value: 50
 default_max_count: 10
 player_ship_roles: tsn
-build_speeds:
+build_times:
     command: 3
     civil: 10
     industry: 2
@@ -198,7 +225,7 @@ behavior: homing
 energy_conversion_value: 200
 default_max_count: 10
 player_ship_roles: tsn
-build_speeds:
+build_times:
     command: 5
     civil: 20
     industry: 4
@@ -224,7 +251,7 @@ behavior: mine
 energy_conversion_value: 200
 default_max_count: 10
 player_ship_roles: tsn
-build_speeds:
+build_times:
     command: 2
     civil: 8
     industry: 2
@@ -241,7 +268,7 @@ gui_name: Tag
 damage: 0
 default_max_count: 5
 player_ship_roles: tsn
-build_speeds:
+build_times:
     command: 1
     civil: 3
     industry: 1
