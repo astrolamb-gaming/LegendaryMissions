@@ -1,0 +1,271 @@
+# TODO: The build speed data is not yet utilized in docking.mast. 
+
+=== prefab_torpedo_type
+"        key (str): The key by which the torpodo is identified.
+"        gui_text (str, optional): The name of the torpedo as seen by the players. If None, then will be the same as the key.
+"        speed (int, optional): The speed at which the torpedo moves. Default is 10.
+"        lifetime (int, optional): How long (in seconds) the torpedo continues to move. Default is 25.
+"        flare_color (str, optional): The color of the torpedo's exhuast flare. Default is white.
+"        trail_color (str, optional): The color of the torpedo's exhaust trail. Default is white.
+"        warhead (str, optional): A comma-separated string defining the behavior of the warhead upon contact. Default is standard.
+"            * standard - the default behavior of damaging a single target upon hit.
+"            * blast - creates an area of effect with diminishing effects as the distance from the blast epicenter increases.
+"            * reduce_shields - reduces the shields of the target(s). (EMP)
+"
+"        blast_radius (int, optional): How large the area of effect should be, if `warhead` has the type "blast". Default is 1000.
+"        damage (int, optional): The base damage dealt to the target. If `warhead` has the type "blast", damage decreases depending on the distance from the blast's epicenter. Default is 5.
+"        explosion_size (int, optional): The size of the explosion visual effect on the 3d view. Default is 10.
+"        explosion_color (str, optional): The color of the explosion visual effect on the 3d view. Default is "fire".
+"        behaviour (str, optional): The behavior of the torpedo guidance system. Default is homing.
+"            * homing - the torpedo will home in on its target, compensating for movement.
+"            * mine - the torpedo will not move after it has been placed and will detonate when a ship gets close.
+"
+"        player_ship_roles (str, optional): A comma-separated string of roles that should get this torpedo.
+"        energy_conversion_value (int, optional): The amount of energy to provide to the ship by disassembling the torpedo. Default is 100.
+"        build_speeds (dict, optional): A dictionary of (str, int) representing the station type and the rate of production.
+"        on_hit (label, optional): The label to run when the torpedo hits.
+metadata: ```
+key: Homing
+gui_name: Homing
+speed: 10
+lifetime: 25
+flare_color: white
+trail_color: white
+warhead: standard
+blast_radius: 1000 # blast_radius may be broken if warhead isn't "blast"
+damage: 35
+explosion_size: 10
+explosion_color: fire
+behavior: homing
+energy_conversion_value: 100
+default_max_count: 10
+player_ship_roles: __player__
+build_speeds:
+    industry: 3
+    default: 1
+on_hit: default_torp_hit
+```
+
+    if key is None:
+        yield fail
+    if gui_name is None:
+        gui_name = key
+    default speed = 10
+    default lifetime = 25
+    default flare_color = "white"
+    default trail_color = "white"
+    default warhead = "standard"
+    default blast_radius = 1000
+    default damage = 35
+    default explosion_size = 10
+    default explosion_color = "fire"
+    default behavior = "homing"
+    default energy_conversion_value = 100
+    default default_max_count = 10
+    default player_ship_roles = "__player__"
+    default build_speeds = {"default": 3, "industry": 1}
+
+    ~~ torpedo_type(key=key, 
+        gui_text=gui_name, 
+        speed=speed, 
+        lifetime=lifetime, 
+        flare_color=flare_color, 
+        trail_color=trail_color, 
+        warhead=warhead, 
+        blast_radius=blast_radius, 
+        damage=damage, 
+        explosion_size=explosion_size, 
+        explosion_color=explosion_color, 
+        behavior=behavior, 
+        energy_conversion_value=energy_conversion_value) ~~
+    id = prefab.get_id()
+    add_role(id, "torpedo_definition")
+    add_role(id, key)
+
+    roles = player_ship_roles.split(",")
+    for r in roles:
+        ships = role(r) & role("__player__") # should only apply to player ships
+        for ship in ships:
+            count,_max = torpedo_get_count_for_ship(ship, key)
+            if _max == 0:
+                _max = default_max_count
+            torpedo_make_available(ship, key, _max)
+
+    # I think this isn't necessary
+    # set_inventory_value(id, "station_build_speeds", build_speeds)
+
+    yield result id
+
+//spawn if has_role("__player__")
+" When player ships spawn, add custom torpedo types according to the `player_ship_roles` of the torpedoes.
+    delay_sim(5) # Ensure that ships and torp types have spawned.
+    torps = role("torpedo_definition")
+    for tr in torps:
+        player_ship_roles = get_inventory_value(tr, "player_ship_roles")
+        count = get_inventory_value(tr, "default_max_count")
+        if player_ship_roles is not None:
+            roles = player_ship_roles.split(",")
+            for r in roles:
+                if has_role(SPAWNED_ID, r):
+                    cur_count, cur_max = torpedo_get_count_for_ship(SPAWNED_ID, tr)
+                    if cur_max == 0:
+                        torpedo_make_available(SPAWNED_ID, tr, count)
+
+
+#### NOTE: Because this is inefficient, I'm leaving it commented out. But I want it here for now as a reference.
+###### Probably the right thing is to use //damage/object if EVENT.sub_tag == "torp_key"
+###### Which means that the `on_hit` metadata field is probably unnecessary.
+# //damage/object
+# " This label runs anytime an object is damaged. This is probably NOT an ideal long-term solution.
+#     # TODO: Find a better way to do this?
+#     torps = role(EVENT.sub_tag) & role("torpedo_definition")
+#     if len(torps) > 0:
+#         t = torps.pop()
+#         lbl = get_inventory_value(t, "on_hit")
+#         # print(lbl)
+#         if lbl is not None:
+#             task_schedule(lbl, {"torpedo_key":t})
+#     ->END
+
+# === default_torp_hit
+# " The default behavior for a torpedo hitting an object. This is really just an example.
+# " For a custom torpedo, you want to make your own label to run, if it needs to do anything special.
+# metadata: ```
+# torpedo_key:
+# ```
+#     print(f"Torpedo hit!")
+#     ->END
+
+
+=== prefab_homing_torpedo
+metadata: ```
+key: Homing
+gui_name: Homing
+speed: 10
+lifetime: 25
+flare_color: white
+trail_color: white
+warhead: standard
+blast_radius: 1000
+damage: 35
+explosion_size: 10
+explosion_color: fire
+behavior: homing
+energy_conversion_value: 100
+default_max_count: 10
+player_ship_roles: tsn
+build_speeds:
+    command: 2
+    civil: 6
+    industry: 1
+    science: 6
+    default: 3
+on_hit:
+```
+    jump prefab_torpedo_type
+
+=== prefab_emp_torpedo
+metadata: ```
+key: EMP
+gui_name: EMP
+speed: 10
+lifetime: 25
+flare_color: yellow
+trail_color: #99f
+warhead: blast,reduce_shields
+blast_radius: 1000
+damage: 50
+explosion_size: 20
+explosion_color: #11F
+behavior: homing
+energy_conversion_value: 50
+default_max_count: 10
+player_ship_roles: tsn
+build_speeds:
+    command: 3
+    civil: 10
+    industry: 2
+    science: 10
+    default: 5
+on_hit: None
+```
+    jump prefab_torpedo_type
+
+=== prefab_nuclear_torpedo
+metadata: ```
+key: Nuke
+gui_name: Nuke
+speed: 10
+lifetime: 25
+flare_color: white
+trail_color: #99f
+warhead: blast
+blast_radius: 1000
+damage: 5
+explosion_size: 10
+explosion_color: fire
+behavior: homing
+energy_conversion_value: 200
+default_max_count: 10
+player_ship_roles: tsn
+build_speeds:
+    command: 5
+    civil: 20
+    industry: 4
+    science: 20
+    default: 10
+on_hit: None
+```
+    jump prefab_torpedo_type
+
+=== prefab_mine_torpedo
+metadata: ```
+key: Mine
+gui_name: Mine
+speed: 10
+lifetime: 25
+flare_color: white
+trail_color: white
+warhead: blast
+blast_radius: 1000
+damage: 5
+explosion_size: 20
+explosion_color: fire
+behavior: mine
+energy_conversion_value: 200
+default_max_count: 10
+player_ship_roles: tsn
+build_speeds:
+    command: 2
+    civil: 8
+    industry: 2
+    science: 8
+    default: 4
+on_hit: None
+```
+    jump prefab_torpedo_type
+
+== prefab_tag_torpedo
+" A basic implementation of the Artemis 2.8 Tag torpedo type.
+metadata: ```
+key: Tag
+gui_name: Tag
+damage: 0
+default_max_count: 5
+player_ship_roles: tsn
+build_speeds:
+    command: 1
+    civil: 3
+    industry: 1
+    science: 1
+    default: 4
+on_hit: apply_tag
+```
+    jump prefab_torpedo_type
+
+#//damage/object if EVENT.sub_tag == "Tag"
+== apply_tag 
+    
+    add_role(DAMAGE_TARGET_ID, "tagged")
+    # TODO: Add a use for the "tagged" role.
+    # TODO: May be better to use a link instead of, or in addition to, the role?
