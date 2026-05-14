@@ -32,7 +32,7 @@ lifetime: 25
 flare_color: white
 trail_color: white
 warhead: standard
-blast_radius: 1000 # blast_radius may be broken if warhead isn't "blast"
+blast_radius: 1000 # only applicable if warhead == 'blast'
 damage: 35
 explosion_size: 10
 explosion_color: fire
@@ -43,13 +43,14 @@ player_ship_roles: __player__
 build_speeds:
     industry: 3
     default: 1
-on_hit: default_torp_hit
 ```
 
     if key is None:
         yield fail
     if gui_name is None:
         gui_name = key
+    if len(role(key) & role("torpedo_definition")) > 0: # if torp already exists
+        yield fail
     default speed = 10
     default lifetime = 25
     default flare_color = "white"
@@ -84,7 +85,8 @@ on_hit: default_torp_hit
 
     roles = player_ship_roles.split(",")
     for r in roles:
-        ships = role(r) & role("__player__") # should only apply to player ships
+        ships = role(r) & role("__player__") # should only apply to existing player ships
+        print(f"Ships: {len(ships)}")
         for ship in ships:
             count,_max = torpedo_get_count_for_ship(ship, key)
             if _max == 0:
@@ -96,45 +98,35 @@ on_hit: default_torp_hit
 
     yield result id
 
-//spawn if has_role("__player__")
+# Here we handle spawning of ships, and giving them torps as determined by the torpedo's definitions.
+//spawn if has_role(SPAWNED_ID, "__player__")
+    await delay_sim(1) # Wait until all torp definitions are loaded
+    ship = SPAWNED_ID
+    jump give_custom_torps_to_players
+
+
+==== give_custom_torps_to_players
 " When player ships spawn, add custom torpedo types according to the `player_ship_roles` of the torpedoes.
-    delay_sim(5) # Ensure that ships and torp types have spawned.
+    if ship is None:
+        # print("`ship` not defined for `give_custom_torps_to_players` label.")
+        ->END
+    if to_object(ship) is None:
+        # print("Object for `ship` not found.") # This fires multiple times on startup, not sure why.
+        ->END
     torps = role("torpedo_definition")
     for tr in torps:
+        key = get_inventory_value(tr, "key")
         player_ship_roles = get_inventory_value(tr, "player_ship_roles")
         count = get_inventory_value(tr, "default_max_count")
         if player_ship_roles is not None:
             roles = player_ship_roles.split(",")
             for r in roles:
-                if has_role(SPAWNED_ID, r):
-                    cur_count, cur_max = torpedo_get_count_for_ship(SPAWNED_ID, tr)
-                    if cur_max == 0:
-                        torpedo_make_available(SPAWNED_ID, tr, count)
-
-
-#### NOTE: Because this is inefficient, I'm leaving it commented out. But I want it here for now as a reference.
-###### Probably the right thing is to use //damage/object if EVENT.sub_tag == "torp_key"
-###### Which means that the `on_hit` metadata field is probably unnecessary.
-# //damage/object
-# " This label runs anytime an object is damaged. This is probably NOT an ideal long-term solution.
-#     # TODO: Find a better way to do this?
-#     torps = role(EVENT.sub_tag) & role("torpedo_definition")
-#     if len(torps) > 0:
-#         t = torps.pop()
-#         lbl = get_inventory_value(t, "on_hit")
-#         # print(lbl)
-#         if lbl is not None:
-#             task_schedule(lbl, {"torpedo_key":t})
-#     ->END
-
-# === default_torp_hit
-# " The default behavior for a torpedo hitting an object. This is really just an example.
-# " For a custom torpedo, you want to make your own label to run, if it needs to do anything special.
-# metadata: ```
-# torpedo_key:
-# ```
-#     print(f"Torpedo hit!")
-#     ->END
+                if has_role(ship, r):
+                    counts = torpedo_get_count_for_ship(ship, key)
+                    if counts[1] == 0: # Only add if the torp isn't added already
+                        # print(f"Making {key} available: {count}")
+                        torpedo_make_available(ship, key, count)
+    ->END
 
 
 === prefab_homing_torpedo
@@ -160,7 +152,6 @@ build_speeds:
     industry: 1
     science: 6
     default: 3
-on_hit:
 ```
     jump prefab_torpedo_type
 
@@ -187,7 +178,6 @@ build_speeds:
     industry: 2
     science: 10
     default: 5
-on_hit: None
 ```
     jump prefab_torpedo_type
 
@@ -214,7 +204,6 @@ build_speeds:
     industry: 4
     science: 20
     default: 10
-on_hit: None
 ```
     jump prefab_torpedo_type
 
@@ -241,7 +230,6 @@ build_speeds:
     industry: 2
     science: 8
     default: 4
-on_hit: None
 ```
     jump prefab_torpedo_type
 
@@ -259,13 +247,14 @@ build_speeds:
     industry: 1
     science: 1
     default: 4
-on_hit: apply_tag
 ```
     jump prefab_torpedo_type
 
-#//damage/object if EVENT.sub_tag == "Tag"
-== apply_tag 
-    
+/*
+    This is an example of how to add custom functionality when a torpedo hits something.
+*/
+//damage/object if EVENT.sub_tag == "Tag"
     add_role(DAMAGE_TARGET_ID, "tagged")
+    print("Ship Tagged!")
     # TODO: Add a use for the "tagged" role.
     # TODO: May be better to use a link instead of, or in addition to, the role?

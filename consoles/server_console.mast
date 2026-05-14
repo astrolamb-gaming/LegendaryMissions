@@ -73,6 +73,8 @@ gui_reroute_clients("client_main")
     prefab_spawn(prefab_mine_torpedo)
     prefab_spawn(prefab_emp_torpedo)
     prefab_spawn(prefab_nuclear_torpedo)
+    # TODO: Uncomment to use Tags (they don't do anything yet!)
+    # prefab_spawn(prefab_tag_torpedo)
 
     #
     # Create all the player ships
