@@ -1,5 +1,3 @@
-# TODO: The build speed data is not yet utilized in docking.mast. 
-
 === prefab_torpedo_type
 "        key (str): The key by which the torpodo is identified.
 "        gui_text (str, optional): The name of the torpedo as seen by the players. If None, then will be the same as the key.
@@ -13,17 +11,16 @@
 "            * reduce_shields - reduces the shields of the target(s). (EMP)
 "
 "        blast_radius (int, optional): How large the area of effect should be, if `warhead` has the type "blast". Default is 1000.
-"        damage (int, optional): The base damage dealt to the target. If `warhead` has the type "blast", damage decreases depending on the distance from the blast's epicenter. Default is 5.
+"        damage (int, optional): The base damage dealt to the target. If `warhead` has the type "blast", damage decreases depending on the distance from the blast's epicenter. Default is 35.
 "        explosion_size (int, optional): The size of the explosion visual effect on the 3d view. Default is 10.
 "        explosion_color (str, optional): The color of the explosion visual effect on the 3d view. Default is "fire".
 "        behaviour (str, optional): The behavior of the torpedo guidance system. Default is homing.
 "            * homing - the torpedo will home in on its target, compensating for movement.
 "            * mine - the torpedo will not move after it has been placed and will detonate when a ship gets close.
 "
-"        player_ship_roles (str, optional): A comma-separated string of roles that should get this torpedo.
+"        player_ship_roles (str, optional): A comma-separated string of roles that should get this torpedo. The `__player__` role is always necessary.
 "        energy_conversion_value (int, optional): The amount of energy to provide to the ship by disassembling the torpedo. Default is 100.
 "        build_times (dict, optional): A dictionary of (str, int) representing the station type and the rate of production.
-"        on_hit (label, optional): The label to run when the torpedo hits.
 metadata: ```
 key: Homing
 gui_name: Homing
@@ -41,10 +38,10 @@ energy_conversion_value: 100
 default_max_count: 10
 player_ship_roles: __player__
 build_times:
-    industry: 3
-    default: 1
+    industry: 1
+    default: 3
 ```
-
+    # Technically the metadata for this label is unnecessary, but I'm leaving it in place for use by the extension.
     if key is None:
         yield fail
     if gui_name is None:
@@ -86,18 +83,17 @@ build_times:
     roles = player_ship_roles.split(",")
     for r in roles:
         ships = role(r) & role("__player__") # should only apply to existing player ships
-        print(f"Ships: {len(ships)}")
+        # print(f"Ships: {len(ships)}")
         for ship in ships:
             count,_max = torpedo_get_count_for_ship(ship, key)
-            if _max == 0:
+            if _max == 0: # Only add if not already defined in shipData
                 _max = default_max_count
             torpedo_make_available(ship, key, _max)
 
-    # I think this isn't necessary
-    # set_inventory_value(id, "station_build_times", build_times)
-
     yield result id
 
+
+#region Station Spawn and Production Time Assignment
 //spawn if has_role(SPAWNED_ID, "station")
     await delay_sim(1)
     s = SPAWNED_ID
@@ -109,6 +105,7 @@ build_times:
     so = to_object(s)
     if so is None:
         ->END
+    # TODO: instead of using art_id, might be better to use roles? The applicable roles would need added to shipData.yaml
     artid = so.art_id
     torps = role("torpedo_definition")
     torp_keys = []
@@ -120,12 +117,18 @@ build_times:
             if station_type in artid:
                 time = times[station_type]
                 set_inventory_value(s, f"{key}_BUILD_SPEED", time)
+                if get_data_set_value(s, f"{key}_NUM") is None: # If it's not already set, set it.
+                    set_data_set_value(s, f"{key}_NUM", random.randrange(0,3)) 
                 break
     # @inventory torpedo_production_keys A list of all the keys of torpedoes this station could produce
     set_inventory_value(s, "torpedo_production_keys", torp_keys)
+    set_data_set_value(s, "torpedo_types_available", ",".join(torp_keys))
     ->END
 
+#endregion
+
 # Here we handle spawning of ships, and giving them torps as determined by the torpedo's definitions.
+#region Player Ship Torp Assignment
 //spawn if has_role(SPAWNED_ID, "__player__")
     await delay_sim(1) # Wait until all torp definitions are loaded
     ship = SPAWNED_ID
@@ -154,7 +157,7 @@ build_times:
                         # print(f"Making {key} available: {count}")
                         torpedo_make_available(ship, key, count)
     ->END
-
+#endregion
 
 === prefab_homing_torpedo
 metadata: ```
@@ -266,6 +269,7 @@ metadata: ```
 key: Tag
 gui_name: Tag
 damage: 0
+explosion_size: 1
 default_max_count: 5
 player_ship_roles: tsn
 build_times:

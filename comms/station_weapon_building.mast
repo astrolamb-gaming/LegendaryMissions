@@ -71,6 +71,8 @@ shared surrender_color = "yellow"
     stats = ""
     for t in torp_keys:
         count = get_data_set_value(COMMS_SELECTED_ID, f"{t}_NUM", 0)
+        if count is None:
+            count = 0
         time = get_build_time_for(COMMS_SELECTED_ID, t)
         stats += """ ^{t: <10}{count: >5}{"": >16}{time}:00"""
 
@@ -125,6 +127,8 @@ shared surrender_color = "yellow"
 
 
     cur_count = get_data_set_value(station_id, f"{torpedo_build_type}_NUM", 0)
+    if cur_count is None:
+        cur_count = 0
     set_data_set_value(station_id, f"{torpedo_build_type}_NUM", cur_count+1, 0)
 
     side = station.side
