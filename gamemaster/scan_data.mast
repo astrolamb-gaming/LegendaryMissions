@@ -1,0 +1,29 @@
+
+//comms/science/gamemaster/info
+    gui_button("section info")
+    gui_row("row-height: 20px;")
+    gui_text("Some more info")
+    gui_row()
+    gui_button("More info")
+    yield success
+
+//comms/science/gamemaster/info
+    gui_text("Second one.")
+    gui_row()
+    gui_image_keep_aspect_ratio_center("data/graphics/ships/kralien_dreadnought",style="background-color: #293258ff;col-width: 1.5em;")
+    yield success
+
+//comms/science/gamemaster/info
+    gui_row("row-height: 20px;")
+    gui_button("Test 20px")
+    gui_row("row-height: 30px;")
+    gui_button("Test 30px;","background: #674646; border: 3px; border-color: #888777")
+    yield success
+
+//comms/science/gamemaster/data
+    gui_text("Some data")
+    gui_row()
+    gui_text("More data")
+    gui_row()
+    gui_image_keep_aspect_ratio_center("data/graphics/ships/kralien_dreadnought",style="background-color: #293258ff;col-width: 1.5em;")
+    yield success
