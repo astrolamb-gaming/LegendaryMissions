@@ -1,20 +1,47 @@
 
-//comms/science/gamemaster/info
-    gui_button("section info")
-    gui_row("row-height: 20px;")
-    gui_text("Some more info")
+//comms/science/gamemaster/info if True == True
+    b = gui_button("section info", on_press=test_button_route)
     gui_row()
-    gui_button("More info")
-    yield success
+    sec = gui_sub_section()
+    visible = True
+    with sec:
+        gui_text("Some more info")
+        gui_row()
+        gui_button("More info")
+    on gui_message(b):
+        print("Toggling hide...")
+        visible = not visible
+        if visible:
+            gui_show(sec)
+        else:
+            gui_hide(sec)
 
+=== test_button_route
+    print("TESTING")
+    
 //comms/science/gamemaster/info
-    gui_text("Second one.")
-    gui_row()
-    gui_image_keep_aspect_ratio_center("data/graphics/ships/kralien_dreadnought",style="background-color: #293258ff;col-width: 1.5em;")
-    yield success
+    # with gui_sub_section():
+        # gui_row("row-height: 50px;")
+        gui_row()
+        with gui_sub_section("col-width: 20px;"):
+            gui_row("row-height: 20px;")
+            gui_image_keep_aspect_ratio_center("data/graphics/ships/kralien_dreadnought",style="background-color: #293258ff;col-width: 1.5em;")
+            # gui_row("row-height: 20px;")
+            # gui_text("TSN Dreadnaught")
+        with gui_sub_section("row-height: 20px;"):
+            gui_row("row-height: 20px;")
+            gui_text("A big ass ship")
+            gui_row("row-height: 20px;")
+            gui_text("More details")
+        gui_row("row-height: 20px;")
+        gui_text("Some text")
+        gui_row("row-height: 50px;")
+        gui_text("TEXT!!!")
+        gui_row()
+    # yield success
 
-//comms/science/gamemaster/info
-    gui_row("row-height: 20px;")
+//comms/science/gamemaster/info if True and True
+    # gui_row("row-height: 20px;")
     gui_button("Test 20px")
     gui_row("row-height: 30px;")
     gui_button("Test 30px;","background: #674646; border: 3px; border-color: #888777")
@@ -26,4 +53,4 @@
     gui_text("More data")
     gui_row()
     gui_image_keep_aspect_ratio_center("data/graphics/ships/kralien_dreadnought",style="background-color: #293258ff;col-width: 1.5em;")
-    yield success
+    # yield success

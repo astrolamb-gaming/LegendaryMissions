@@ -3,6 +3,7 @@ from sbs_utils.helpers import FrameContext
 from sbs_utils.mast.parsers import LayoutAreaParser
 from sbs_utils.pages.layout import layout as layout
 from sbs_utils.pages.layout.bounds import Bounds
+from sbs_utils.pages.widgets.layout_listbox import SubPage
 from sbs_utils.procedural.gui import gui_row
 from sbs_utils.procedural.execution import labels_get_type
 from sbs_utils.procedural.inventory import get_inventory_value
@@ -56,6 +57,76 @@ def _collect_labels_by_filter(label_type):
     return ret
 
 
+def _route_label_render_plan(task, label):
+    """Return (include_label, active_cmd_index) for rendering a label preview."""
+    if task is None or label is None:
+        return (False, 0)
+
+    cmds = getattr(label, "cmds", None)
+    if not cmds:
+        return (True, 0)
+
+    first_cmd = cmds[0]
+    if_code = getattr(first_cmd, "if_code", None)
+    cmd_line = getattr(first_cmd, "line", "")
+
+    # Route labels inject a leading "yield fail if ..." command.
+    # For preview rendering:
+    # - include only when route condition is True
+    # - skip the guard command so the UI body can render
+    if if_code is not None and isinstance(cmd_line, str) and " entry test " in cmd_line:
+        try:
+            guard_should_fail = bool(task.eval_code(if_code))
+            if guard_should_fail:
+                return (False, 0)
+            return (True, 1)
+        except Exception:
+            # If evaluation fails in this context, keep the default behavior.
+            return (True, 0)
+
+    return (True, 0)
+
+
+class _LabelStackSubPage(SubPage):
+    """SubPage wrapper that keeps row heights consistent with procedural GUI defaults."""
+
+    def __init__(self, tag_prefix, region_tag, task, client_id) -> None:
+        super().__init__(tag_prefix, region_tag, task, client_id)
+        self._minimum_row_height = LayoutAreaParser.parse_e2(LayoutAreaParser.lex("1.5em"))
+
+    def add_row(self):
+        row = super().add_row()
+        row.default_height = self._minimum_row_height
+        return row
+
+    def push_sub_section(self, style, layout_item, is_rebuild):
+        sub_layout = super().push_sub_section(style, layout_item, is_rebuild)
+        if self.pending_row is not None and getattr(self.pending_row, "default_height", None) is None:
+            self.pending_row.default_height = self._minimum_row_height
+        return sub_layout
+
+    def pop_sub_section(self, add, is_rebuild):
+        (parent_layout, parent_row) = self.sub_sections.pop()
+        child_layout = self.active_layout
+
+        # Commit the child subsection's working row before attaching the subsection.
+        if self.pending_row is not None and len(self.pending_row.columns) > 0:
+            child_layout.add(self.pending_row)
+
+        if add:
+            if parent_row is None:
+                parent_row = layout.Row()
+                parent_row.tag = self.get_tag()
+                parent_row.default_height = self._minimum_row_height
+                parent_layout.add(parent_row)
+            elif getattr(parent_row, "default_height", None) is None:
+                parent_row.default_height = self._minimum_row_height
+            parent_row.add(child_layout)
+
+        self.active_layout = parent_layout
+        self.pending_row = parent_row
+
+
 def gui_label_stack_listbox(
     style="",
     items=None,
@@ -77,14 +148,21 @@ def gui_label_stack_listbox(
     tag_prefix = page.get_tag()
 
     combined_section = layout.Layout(tag_prefix + ":combined", None, 0, 0, 100, 100)
-    combined_page = _SectionPage(combined_section, tag_prefix, task)
+    combined_page = _LabelStackSubPage(tag_prefix, getattr(page, "region_tag", ""), task, getattr(page, "client_id", None))
+    combined_page.next_slot(0, combined_section)
     task.main.page = combined_page
     FrameContext.page = combined_page
 
-    for i, label in enumerate(items):
+    visible_items = []
+    for label in items:
+        include_label, active_cmd = _route_label_render_plan(task, label)
+        if include_label:
+            visible_items.append((label, active_cmd))
+
+    for i, (label, active_cmd) in enumerate(visible_items):
         if i > 0:
             gui_row()
-        task.start_sub_task(label, {"STACK_LABEL": label}, defer=False)
+        task.start_sub_task(label, {"STACK_LABEL": label}, defer=False, active_cmd=active_cmd)
 
     task.main.page = original_main_page
     FrameContext.page = original_frame_page
@@ -110,6 +188,7 @@ class LabelStackListbox(layout.Column):
         self.slider_style = LayoutAreaParser.parse_e2(LayoutAreaParser.lex("1em"))
         self.overscan_pixels = 0.0
         self.overscan_ratio = 0.15
+        self.row_step_pixels = 0.0
 
     def _present(self, event):
         CID = event.client_id
@@ -130,6 +209,7 @@ class LabelStackListbox(layout.Column):
         content_right = right - slider_width
         available_height = bottom - top
         self.overscan_pixels = LayoutAreaParser.compute(self.minimum_row_height, None, aspect_ratio.y, 20) * self.overscan_ratio
+        self.row_step_pixels = max(1.0, LayoutAreaParser.compute(self.minimum_row_height, None, aspect_ratio.y, 20))
 
         self.combined_section.set_bounds(Bounds(left, 0, content_right, available_height))
         self.combined_section.calc(CID)
@@ -141,6 +221,37 @@ class LabelStackListbox(layout.Column):
             self.scroll_offset_pixels = max_scroll
 
         if total_content_height > available_height:
+            button_height = slider_width
+            if button_height * 2 >= available_height:
+                button_height = max(0.0, available_height / 4.0)
+
+            slider_top = self.bounds.top + button_height
+            slider_bottom = self.bounds.bottom - button_height
+
+            # Draw the icon for the Scroll Up button.
+            SBS.send_gui_icon(
+                CID,
+                self.local_region_tag,
+                f"{self.tag_prefix}iup",
+                "icon_index:148;color:#aaa;draw_layer:1000;",
+                right - slider_width,
+                self.bounds.top,
+                right,
+                slider_top,
+            )
+            # Make the click region for the Scroll Up button
+            SBS.send_gui_clickregion(
+                CID,
+                self.local_region_tag,
+                f"{self.tag_prefix}up",
+                "background_color:#6663",
+                right - slider_width,
+                self.bounds.top,
+                right,
+                slider_top,
+            )
+
+            # The actual slider.
             SBS.send_gui_slider(
                 CID,
                 self.local_region_tag,
@@ -148,10 +259,35 @@ class LabelStackListbox(layout.Column):
                 max_scroll - self.scroll_offset_pixels,
                 f"low:0.0; high:{max_scroll}; show_number:no",
                 right - slider_width,
-                self.bounds.top,
+                slider_top,
+                right,
+                slider_bottom,
+            )
+
+            # Draw the icon for the Scroll Down button
+            SBS.send_gui_icon(
+                CID,
+                self.local_region_tag,
+                f"{self.tag_prefix}idown",
+                "icon_index:150;color:#aaa;draw_layer:1000;",
+                right - slider_width,
+                slider_bottom,
                 right,
                 self.bounds.bottom,
             )
+
+            # Make the click region for the Scroll Down button.
+            SBS.send_gui_clickregion(
+                CID,
+                self.local_region_tag,
+                f"{self.tag_prefix}down",
+                "background_color:#6663",
+                right - slider_width,
+                slider_bottom,
+                right,
+                self.bounds.bottom,
+            )
+            
 
         viewport_top = self.scroll_offset_pixels
         viewport_bottom = min(total_content_height, self.scroll_offset_pixels + available_height + self.overscan_pixels)
@@ -198,6 +334,10 @@ class LabelStackListbox(layout.Column):
             return
         if event.sub_tag.endswith("cur"):
             self.on_scroll(event)
+        elif event.sub_tag.endswith("up"):
+            self._scroll_by_rows(event, -1)
+        elif event.sub_tag.endswith("down"):
+            self._scroll_by_rows(event, 1)
 
     def on_scroll(self, event):
         if event.sub_tag == f"{self.tag_prefix}cur":
@@ -205,71 +345,59 @@ class LabelStackListbox(layout.Column):
             self.gui_state = "redraw"
             self.represent(event)
 
+    def _scroll_by_rows(self, event, direction):
+        if not self._snap_to_adjacent_row_top(direction):
+            return
+        if self.scroll_offset_pixels < 0.0:
+            self.scroll_offset_pixels = 0.0
+        if self.scroll_offset_pixels > self.max_scroll_pixels:
+            self.scroll_offset_pixels = self.max_scroll_pixels
+        self.gui_state = "redraw"
+        self.represent(event)
 
-class _SectionPage:
-    def __init__(self, section, tag_prefix, task):
-        self._section = section
-        self._tag_counter = 0
-        self._tag_prefix = tag_prefix
-        self._pending_row = None
-        self._minimum_row_height = LayoutAreaParser.parse_e2(LayoutAreaParser.lex("1.5em"))
-        self.gui_task = task
-        self.region_tag = ""
-        self.client_id = None
+    def _snap_to_adjacent_row_top(self, direction):
+        all_rows = getattr(self.combined_section, "rows", None)
+        if not all_rows:
+            return False
 
-    def _new_row(self, default_height=None):
-        row = layout.Row()
-        row.tag = self.get_tag()
-        row.default_height = default_height if default_height is not None else self._minimum_row_height
-        return row
+        # Snap only across non-empty rows.
+        rows = [
+            row
+            for row in all_rows
+            if getattr(row, "bounds", None) is not None and len(getattr(row, "columns", [])) > 0
+        ]
+        if not rows:
+            return False
 
-    def get_tag(self):
-        self._tag_counter += 1
-        return f"{self._tag_prefix}:lbl:{self._tag_counter}"
+        tops = sorted({row.bounds.top for row in rows})
+        if not tops:
+            return False
 
-    def add_content(self, layout_item, runtime_node):
-        if self._pending_row is None:
-            default_height = getattr(layout_item, "default_height", None)
-            self._pending_row = self._new_row(default_height)
-            self._section.add(self._pending_row)
-        elif getattr(self._pending_row, "default_height", None) is None:
-            default_height = getattr(layout_item, "default_height", None)
-            self._pending_row.default_height = default_height if default_height is not None else self._minimum_row_height
-        self._pending_row.add(layout_item)
+        cur = self.scroll_offset_pixels
+        epsilon = 0.01
 
-    def add_row(self):
-        self._pending_row = self._new_row(self._minimum_row_height)
-        self._section.add(self._pending_row)
-        return self._pending_row
+        # Anchor to the row that currently starts at or above the viewport top.
+        anchor = -1
+        for i, top in enumerate(tops):
+            if top <= cur + epsilon:
+                anchor = i
+            else:
+                break
 
-    def get_pending_row(self):
-        return self._pending_row
+        if direction > 0:
+            # Down: move to the next non-empty row top.
+            if anchor < 0:
+                self.scroll_offset_pixels = tops[0]
+                return True
+            if anchor + 1 < len(tops):
+                self.scroll_offset_pixels = tops[anchor + 1]
+                return True
+            self.scroll_offset_pixels = self.max_scroll_pixels
+            return True
 
-    def push_sub_section(self, style, layout_item, is_rebuild):
-        if layout_item is None:
-            tag = self.get_tag()
-            layout_item = layout.Layout(tag, None, 0, 0, 100, 90)
-            apply_control_styles(".section", style, layout_item, self.gui_task)
-            inner_row = layout.Row()
-            inner_row.tag = self.get_tag()
-            inner_row.default_height = self._minimum_row_height
-            layout_item.add(inner_row)
-        self._sub_stack = getattr(self, "_sub_stack", [])
-        self._sub_stack.append((self._section, self._pending_row))
-        self._section = layout_item
-        self._pending_row = None
-        if len(layout_item.rows) > 0:
-            self._pending_row = layout_item.rows.pop()
-        return layout_item
-
-    def pop_sub_section(self, add, is_rebuild):
-        (parent_sec, parent_row) = self._sub_stack.pop()
-        if add:
-            if parent_row is None:
-                parent_row = self._new_row(getattr(self._section, "default_height", None))
-                self._section.add(parent_row)
-            elif getattr(parent_row, "default_height", None) is None:
-                parent_row.default_height = getattr(self._section, "default_height", None) or self._minimum_row_height
-            parent_row.add(self._section)
-        self._section = parent_sec
-        self._pending_row = parent_row
+        # Up: move to the previous non-empty row top.
+        if anchor <= 0:
+            self.scroll_offset_pixels = 0.0
+            return True
+        self.scroll_offset_pixels = tops[anchor - 1]
+        return True
