@@ -1,3 +1,4 @@
+from sbs_utils.pages.layout.column import Column
 from sbs_utils.gui import get_client_aspect_ratio
 from sbs_utils.helpers import FrameContext
 from sbs_utils.mast.parsers import LayoutAreaParser
@@ -173,7 +174,7 @@ def gui_label_stack_listbox(
     return widget
 
 
-class LabelStackListbox(layout.Column):
+class LabelStackListbox(Column):
     def __init__(self, tag_prefix, combined_section) -> None:
         super().__init__(0, 0, 33, 44)
 
