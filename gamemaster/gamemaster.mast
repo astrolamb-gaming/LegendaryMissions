@@ -69,8 +69,8 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
 
         # Set up scan sources
         stations_friendly = any_role("__npc__,__player__")
+        #@link extra_scan_source: All the sources which provide scan information to this object
         link(cambot_id,"extra_scan_source" ,stations_friendly)
-
     last_sci = cambot_id
     #
     # Should have a way to get all sides - now we do!
@@ -305,7 +305,12 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         ~~ gui_info_panel_add("gamemaster_camera", 13, 
             gamemaster_panel_camera_show, 
             gamemaster_panel_camera_hide, var=GM_RIGHT) ~~
-        gui_info_panel_add("game_stats", 15, show=show_gm_stats, hide=hide_gm_stats, var=GM_RIGHT)
+        ship_id = sbs.get_ship_of_client(client_id)
+        ~~ gui_info_panel_add("game_stats", 15, 
+            show_gm_stats, 
+            hide_gm_stats, 
+            update_gm_stats,#(ship_id,0,0,0,0),
+            var=GM_RIGHT) ~~
         ~~ gui_info_panel_add("comms_waterfall", 112, 
             lambda cid, left, top, width, height: gui_panel_widget_show(cid, left, top, width, height, "comms_waterfall"), 
             lambda cid, left, top, width, height: gui_panel_widget_hide(cid, left, top, width, height, "comms_waterfall"),
@@ -407,7 +412,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     #endregion
 
 
-    task_schedule(update_gm_stats)
+    # task_schedule(update_gm_stats)
     await gui()
 
 
@@ -420,7 +425,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     #     if l.name.startswith("__route__signal"):
     #         print(l.name)
     default_side = side
-
+    vec3(1)
     print("--------------------gamemaster_side_relations------------------------")
     print("{default_side}")
     side_ids = sides_set()
@@ -587,8 +592,8 @@ buttons:
     comms_broadcast(0, "BUTTON PRESSED!")
     ->END
 
-==== update_gm_stats
-    jump END
+# ==== update_gm_stats
+#     jump END
 
     # await delay_sim(seconds=10)
 
@@ -794,3 +799,16 @@ priority: 40 # Bigger number is higher priority
     debug_print("Terrain")
     gui_button("Testing terrain")
     yield success
+
+
+
+//shared/signal/game_started
+    start_counter(0, "Mission_Elapsed_Time")
+    
+
+//shared/signal/create_player_ships
+    for ship in role("__player__"):
+        set_data_set_value(ship, "eng_control_label", "Test", 1)
+        lbl = get_data_set_value(ship, "eng_control_label", 1)
+        print(f"Label: {lbl}")
+        
