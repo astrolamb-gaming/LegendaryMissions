@@ -104,36 +104,31 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
 --- gui_setup_2
 
     # Build the left bar
-    # gui_section(style="area:50-200px,0,50+200px,50px;")
-    gui_section("area:0,10,40px,100;")
-    gss = gui_sub_section(f"col-width:{info_panel_width};")
-    
-    with gss:
-        gui_row("row-height:5;")
-        gui_blank()
+    # This is for the menu buttons
+    gui_section(f"area:0,40px,{GAMEMASTER_CONSOLE_ICON_SIZE}px,100;")
+    menu = None
+    with gui_sub_section():
+        menus = gm_get_menu_items_tree()
+        print(len(menus))
+        sorted_menus = sorted(list(menus.values()), key=lambda item: item.get_inventory_value("priority"))
         gui_row()
-        # 
-        # GM_LEFT = gui_tabbed_panel([], tab_location=0, icon_size=GAMEMASTER_CONSOLE_ICON_SIZE)
-        # gui_info_panel_add("Close", 151, nothing, var=GM_LEFT)
-        with gui_sub_section():
-            menus = gm_get_menu_items_tree()
-            print(len(menus))
-            sorted_menus = sorted(list(menus.values()), key=lambda item: item.get_inventory_value("priority"))
-
-            gui_row()
-            menu = gui_list_box(sorted_menus, f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px; col-width: 100px;", item_template=gm_build_menu_icons, select=True)
-            gui_list_box([0,1,2,3,4], "")
+        with gui_sub_section(f"col-width: {GAMEMASTER_CONSOLE_ICON_SIZE}px"):
+            menu = gui_list_box(sorted_menus, "", item_template=gm_build_menu_icons, select=True)
+            menu.value = sorted_menus[0]
 
 
-            # for m in menus.keys():
-            #     lbl = menus.get(m)
-            #     icon = lbl.get_inventory_value("icon_index")
-            #     debug_print(f"Building menu: {m} with index: {icon}")
-            #     path = lbl.get_inventory_value("type")
-                # ~~ gui_info_panel_add(path, icon, 
-                # lbl, 
-                # # lambda cid, left, top, width, height: nothing(cid, left, top, width, height, ""), 
-                # var=GM_LEFT ) ~~
+    contents = gui_section(f"area: {GAMEMASTER_CONSOLE_ICON_SIZE}px, 40px, 200px, 100;")
+    gss = gui_sub_section(f"background-color: #0008795d;")
+
+    with gss:
+        gui_blank()
+
+        on change menu.value:
+            gui_represent(contents)
+
+                
+
+
 
 
     with gui_section("area:80,90,100,100;"):

@@ -10,7 +10,7 @@ from sbs_utils.procedural.gui.dropdown import gui_drop_down
 from sbs_utils.procedural.comms import comms_broadcast
 from sbs_utils.procedural.roles import role
 from sbs_utils.procedural.gui import gui_task_for_client, gui_region
-from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type
+from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type, gui_get_variable
 
 
 def gamemaster_show_nav_area(ORIGIN_ID, pos, size_delta, text, selection_type, color):
@@ -189,9 +189,11 @@ def gm_build_menu_icons(item):
     icon = item.get_inventory_value("icon_index")
     if icon is not None:
         print(f"Building icon: {icon}")
-        # gui_icon(f"icon_index: {icon}", "border: 2px; border-color: #555999;")
-        gui_button(f"Icon: {icon}")
-        gui_row()
+        GAMEMASTER_CONSOLE_ICON_SIZE = gui_get_variable("GAMEMASTER_CONSOLE_ICON_SIZE")
+        gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
+        gui_icon(f"icon_index: {icon}; color: #14749aa8;")
+    else:
+        print("Icon is None")
 
 def sort_menu_labels(a,b):
     print("Sorting")
