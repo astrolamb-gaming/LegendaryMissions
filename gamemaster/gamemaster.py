@@ -1,3 +1,5 @@
+from sbs_utils.procedural.gui.button import gui_button
+from sbs_utils.procedural.gui.icon import gui_icon
 from sbs_utils.procedural.inventory import  get_inventory_value, set_inventory_value
 from sbs_utils.procedural.query import get_science_selection, get_weapons_selection, to_object, get_comms_selection
 from sbs_utils.helpers import FrameContext
@@ -8,7 +10,7 @@ from sbs_utils.procedural.gui.dropdown import gui_drop_down
 from sbs_utils.procedural.comms import comms_broadcast
 from sbs_utils.procedural.roles import role
 from sbs_utils.procedural.gui import gui_task_for_client, gui_region
-from sbs_utils.procedural.execution import gui_sub_task_schedule
+from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type
 
 
 def gamemaster_show_nav_area(ORIGIN_ID, pos, size_delta, text, selection_type, color):
@@ -150,5 +152,57 @@ def ship_details_tick(info_panel):
     # gui_blank()
     ship_name = gui_text_area(f"$text:{ship.name}")
     return 1
+
+def gm_get_menu_items_tree(submenu=None):
+    """
+    Get the menu items for the gamemaster
+    """
+    labels = labels_get_type("gm_menu")
+    items = {}
+    for label in labels:
+        tree = label.get_inventory_value("type").split("/")
+        if len(tree) > 2 and submenu is None:
+            # If it's a type with three items, and it's not a submenu, skip it
+            continue
+        if submenu is not None and len(tree) > 2:
+            # If it's a submenu and it's a type with three items, then add it.
+            items[tree[2]] = label
+            continue
+        # If it's not a submenu and it's a type with two items, then add it.
+        if len(tree) == 2:
+            items[tree[1]] = label
+    return items
+
+def gm_show_menu_contents(cid, left, top, width, height, widget):
+    """
+    Build the menu for the gamemaster
+    """
+    newItems = []
+    items = gm_get_menu_items_tree()
+    for k, v in items.items():
+        data = {"name": k, "on_press": "GM_Menu_Select", "args": {"label": v.name}}
+        newItems.append(data)
+    return newItems
+
+def gm_build_menu_icons(item):
+    """Builds the icons to press to go to each menu"""
+    icon = item.get_inventory_value("icon_index")
+    if icon is not None:
+        print(f"Building icon: {icon}")
+        # gui_icon(f"icon_index: {icon}", "border: 2px; border-color: #555999;")
+        gui_button(f"Icon: {icon}")
+        gui_row()
+
+def sort_menu_labels(a,b):
+    print("Sorting")
+    if a is None and b is not None:
+        return False
+    if b is None and a is not None:
+        return True
+    if a is None and b is None:
+        return True
+    a1 = a.get_inventory_value("priority")
+    b1 = b.get_inventory_value("priority")
+    return a1 > b1
 
 
