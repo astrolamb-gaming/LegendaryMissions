@@ -153,24 +153,25 @@ def ship_details_tick(info_panel):
     ship_name = gui_text_area(f"$text:{ship.name}")
     return 1
 
-def gm_get_menu_items_tree(submenu=None):
+def gm_get_menu_items_tree(parent_menu=None):
     """
     Get the menu items for the gamemaster
+    Args:
+        parent_menu: The path of the parent_menu, e.g. `"gm_menu/terrain"`
     """
-    labels = labels_get_type("gm_menu")
+    if parent_menu is None:
+        labels = labels_get_type("gm_menu")
+    else:
+        labels = labels_get_type(parent_menu)
     items = {}
     for label in labels:
-        tree = label.get_inventory_value("type").split("/")
-        if len(tree) > 2 and submenu is None:
-            # If it's a type with three items, and it's not a submenu, skip it
+        path = label.get_inventory_value("type")
+        if parent_menu is not None:
+            items[path] = label
             continue
-        if submenu is not None and len(tree) > 2:
-            # If it's a submenu and it's a type with three items, then add it.
-            items[tree[2]] = label
-            continue
-        # If it's not a submenu and it's a type with two items, then add it.
+        tree = path.split("/")
         if len(tree) == 2:
-            items[tree[1]] = label
+            items[path] = label
     return items
 
 def gm_show_menu_contents(cid, left, top, width, height, widget):
@@ -193,7 +194,18 @@ def gm_build_menu_icons(item):
         gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
         gui_icon(f"icon_index: {icon}; color: #14749aa8;")
     else:
+        gui_text(item.get_inventory_value("type"))
         print("Icon is None")
+
+def gm_build_sub_menu_icons(item):
+    """Builds sub-menu icons"""
+    icon = item.get_inventory_value("icon_index")
+    if icon is not None:
+        GAMEMASTER_CONSOLE_ICON_SIZE = gui_get_variable("GAMEMASTER_CONSOLE_ICON_SIZE")
+        gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
+        gui_icon(f"icon_index: {icon}; color: #14749aa8;")
+    else:
+        gui_text(item.get_inventory_value("type"))
 
 def sort_menu_labels(a,b):
     print("Sorting")

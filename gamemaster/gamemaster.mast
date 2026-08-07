@@ -5,7 +5,7 @@ dolly = 50
 orbit = 180.0
 do_move = 0
 property_pane = None
-info_panel_width = "200px"
+info_panel_width = "300px"
 
 default SETTINGS = settings_get_defaults()
 default shared GAMEMASTER_CONSOLE = SETTINGS.get("GAMEMASTER", {"enable": True})
@@ -14,7 +14,7 @@ default shared GAMEMASTER_CONSOLE_PIN = GAMEMASTER_CONSOLE.get("pin", None)
 default shared GAMEMASTER_CONSOLE_BETA = GAMEMASTER_CONSOLE.get("beta", False)
 default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_size", 45)
 
-@console/gamemaster !0 ^100 "Game Master" if GAMEMASTER_CONSOLE_ENABLED
+@console/gamemaster !0 ^1 "Game Master" if GAMEMASTER_CONSOLE_ENABLED
 " Affect the overall battle
 
     # This is a bit of a work around s the operator doesn't need the pin twice
@@ -105,39 +105,148 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
 
     # Build the left bar
     # This is for the menu buttons
-    gui_section(f"area:0,40px,{GAMEMASTER_CONSOLE_ICON_SIZE}px,100;")
-    menu = None
+    parent = gui_section(f"area:0,40px,{info_panel_width},100;")
+    main_menu_list_box = None
+    menu_labels = gm_get_menu_items_tree()
+    # Fail-safe for if no gm_menu labels are present...
+    if not len(menu_labels):
+        jump gm_test_restart_button
+    sorted_menu_labels = sorted(list(menu_labels.values()), key=lambda item: item.get_inventory_value("priority"))
+
+    # This is the actual list box section
     with gui_sub_section():
-        menus = gm_get_menu_items_tree()
-        print(len(menus))
-        sorted_menus = sorted(list(menus.values()), key=lambda item: item.get_inventory_value("priority"))
         gui_row()
         with gui_sub_section(f"col-width: {GAMEMASTER_CONSOLE_ICON_SIZE}px"):
-            menu = gui_list_box(sorted_menus, "", item_template=gm_build_menu_icons, select=True)
-            menu.value = sorted_menus[0]
+            main_menu_list_box = gui_list_box(sorted_menu_labels, "", item_template=gm_build_menu_icons, select=True)
+            main_menu_list_box.value = sorted_menu_labels[0]
+
+    # Now we set up the contents section.
+    # We need to build sub sections for each menu, but hide all but the current one.
+    contents = gui_section(f"area: {GAMEMASTER_CONSOLE_ICON_SIZE}px, 40px,{info_panel_width}, 100;")
+
+    content_panels = list()
+
+    # This is a dictionary that lets us figure out which panel to present based on which button is pressed.
+    button_panel_dict = {}
+
+    # A dictionary with the key being a content panel to show, and the value being a list of buttons that are presented on that panel. This allows for finding which sub menu to open when opening a different menu.
+    content_panel_buttons = {}
+
+    # This is the currently presented panel, so we know which one to hide when a new panel is presented.
+    cur_panel = None
+    menu_panel = None
+
+    # gss = gui_sub_section(f"background-color: #00043d5d;")
+
+    for m in sorted_menu_labels:
+
+        m_type = m.get_inventory_value("type")
+        subs = gm_get_menu_items_tree(m_type)
+
+        if len(subs) == 1:
+            # No submenus, so run the current menu label.
+            gss_row = gui_row()
+            gss = gui_sub_section()
+            with gss:
+                await gui_sub_task_schedule(m)
+            if menu_panel is not None:
+                gss_row.show(False)
+            else:
+                menu_panel = gss_row
+            content_panels.append(gss_row)
+            continue
 
 
-    contents = gui_section(f"area: {GAMEMASTER_CONSOLE_ICON_SIZE}px, 40px, 200px, 100;")
-    gss = gui_sub_section(f"background-color: #0008795d;")
+        # This is the whole menu area if there's submenus
+        gss_row = gui_row()
+        gss = gui_sub_section()
+        with gss:
 
-    with gss:
-        gui_blank()
+            # Now we handle submenus.
+            # First we will make a new sub section to handle the tabs.
+            tab_row = gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
+            tab_section = gui_sub_section()
+            sorted_subs = sorted(list(subs.values()), key=lambda item: item.get_inventory_value("priority"))
 
-        on change menu.value:
-            gui_represent(contents)
+            # Build the submenu buttons
+            buttons = list()
+            sub_menu_sections = list()
+            for sub in sorted_subs:
+                icon = sub.get_inventory_value("icon_index")
+                if icon is None:
+                    icon = 0
+                button = gui_icon_button(f"icon_index: {icon};")
+                buttons.append(button)
+
+            content_panel_buttons[m] = buttons
+            
+            
+            i = 0
+            for sub in sorted_subs:
+                # Now we build the section for the actual contents.
+                sub_section_row = gui_row()
+                content_section = gui_sub_section()
+                with content_section:
+                    await gui_sub_task_schedule(sub)
+                if cur_panel is None:
+                    cur_panel = sub_section_row
+                else:
+                    gui_hide(sub_section_row)
+                sub_menu_sections.append(sub_section_row)
+                button_panel_dict[buttons[i]] = sub_section_row
+                i+=1
+
+            for button in buttons:
+                on gui_message(button):
+                    # Here we will need to hide/show applicable sub sections
+                    if __ITEM__ is not None:
+                        panel = button_panel_dict.get(__ITEM__)
+                        if panel is not None:
+                            gui_hide(cur_panel)
+                            gui_show(panel)
+                            cur_panel = panel
+                            gui_represent(contents)
+        if menu_panel is not None:
+            gss_row.show(False)
+        else:
+            menu_panel = gss_row
+        content_panels.append(gss_row)
+        # gui_hide(gss_row)
+        gss_row.show(False)
+
+            
+        gss = gui_sub_section()
+        with gss:
+            gui_row()
+
+    # menu.cur is the NOT the index of the menu
+    on change main_menu_list_box.value:
+        index = sorted_menu_labels.index(main_menu_list_box.value)
+        p = content_panels[index]
+        print(f"Index: {index}")
+        if p is not None:
+            p.show(True)
+            print(f"Showing index: {index}")
+            # gui_show(p)
+            # gui_hide(cur_panel)
+            menu_panel.show(False)
+            menu_panel = p
+        # gui_refresh(None)
+        # gui_rebuild(parent)
+        gui_represent(contents)
+        # contents.mark_visual_dirty()
 
                 
 
 
 
-
+--- gm_test_restart_button
     with gui_section("area:80,90,100,100;"):
         b = gui_button("restart")
         on gui_message(b):
             sbs.run_next_mission("LegendaryMissionsDev")
 
     await gui()
-    ->END
 
 --- gui_setup
     #comms_navigate("//comms/gamemaster")
@@ -751,26 +860,34 @@ ship: None
 
     ->END
 
+
+# NOTE: For gm menu priorities, main menu priority should be less than 100, sub menu priority should be 100 or greater.
+# This will prevent (admittedly minor) issues with the order of the main menu's default contents if it has submenus toos.
 === gm_menu_terrain
 metadata: ``` yaml
 type: gm_menu/terrain
 icon_index: 13
-priority: 5 # Bigger number is higher priority
+priority: 80 # Smaller number is higher priority
 ```
     debug_print("Terrain")
+    gui_row("row-height: 5;")
     gui_button("Testing terrain")
+    gui_row()
+    gui_blank()
     yield success
 
 === gm_menu_terrain_asteroids
 metadata: ``` yaml
 type: gm_menu/terrain/asteroids
 icon_index: 54
-priority: 1 # Bigger number is higher priority
+priority: 100 # Smaller number is higher priority
 ```
     # sec = gui_sub_section()
     # with sec:
     debug_print("Spawn button")
     gui_button("Spawn Asteroids")
+    gui_row()
+    gui_blank()
     yield success
 
 
@@ -778,10 +895,12 @@ priority: 1 # Bigger number is higher priority
 metadata: ``` yaml
 type: gm_menu/spawn
 icon_index: 0
-priority: 50 # Bigger number is higher priority
+priority: 20 # Smaller number is higher priority
 ```
-    debug_print("Terrain")
-    gui_button("Testing terrain")
+    debug_print("Spawn - this should not appear")
+    gui_button("Testing Spawn")
+    gui_row()
+    gui_blank()
     yield success
 
 
@@ -789,10 +908,12 @@ priority: 50 # Bigger number is higher priority
 metadata: ``` yaml
 type: gm_menu/selected
 icon_index: 11
-priority: 40 # Bigger number is higher priority
+priority: 10 # Smaller number is higher priority
 ```
     debug_print("Terrain")
     gui_button("Testing terrain")
+    gui_row()
+    gui_blank()
     yield success
 
 
