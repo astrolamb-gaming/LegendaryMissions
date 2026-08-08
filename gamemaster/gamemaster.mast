@@ -175,7 +175,10 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
                 icon = sub.get_inventory_value("icon_index")
                 if icon is None:
                     icon = 0
-                button = gui_icon_button(f"icon_index: {icon};")
+                icon_color = sub.get_inventory_value("icon_color")
+                if icon_color is None:
+                    icon_color = "#404ad8"
+                button = gui_icon_button(f"icon_index: {icon};color: {icon_color};")
                 buttons.append(button)
 
             content_panel_buttons[m] = buttons
@@ -867,6 +870,7 @@ ship: None
 metadata: ``` yaml
 type: gm_menu/terrain
 icon_index: 13
+icon_color: #999872
 priority: 80 # Smaller number is higher priority
 ```
     debug_print("Terrain")
@@ -880,6 +884,7 @@ priority: 80 # Smaller number is higher priority
 metadata: ``` yaml
 type: gm_menu/terrain/asteroids
 icon_index: 54
+icon_color: #b700ff
 priority: 100 # Smaller number is higher priority
 ```
     # sec = gui_sub_section()
@@ -894,7 +899,8 @@ priority: 100 # Smaller number is higher priority
 === gm_menu_spawn
 metadata: ``` yaml
 type: gm_menu/spawn
-icon_index: 0
+icon_index: 156
+icon_color: #ff0000
 priority: 20 # Smaller number is higher priority
 ```
     debug_print("Spawn - this should not appear")
@@ -907,7 +913,8 @@ priority: 20 # Smaller number is higher priority
 === gm_menu_selected
 metadata: ``` yaml
 type: gm_menu/selected
-icon_index: 11
+icon_index: 118
+icon_color: #00ffd5
 priority: 10 # Smaller number is higher priority
 ```
     debug_print("Terrain")

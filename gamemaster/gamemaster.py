@@ -188,11 +188,15 @@ def gm_show_menu_contents(cid, left, top, width, height, widget):
 def gm_build_menu_icons(item):
     """Builds the icons to press to go to each menu"""
     icon = item.get_inventory_value("icon_index")
+    icon_color = item.get_inventory_value("icon_color")
+    print(f"Color: {icon_color}")
+    if icon_color is None:
+        icon_color = "#14749aa8"
     if icon is not None:
-        print(f"Building icon: {icon}")
+        print(f"Building icon: {icon}; color: {icon_color}")
         GAMEMASTER_CONSOLE_ICON_SIZE = gui_get_variable("GAMEMASTER_CONSOLE_ICON_SIZE")
         gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
-        gui_icon(f"icon_index: {icon}; color: #14749aa8;")
+        gui_icon(f"icon_index: {icon};color: {icon_color};")
     else:
         gui_text(item.get_inventory_value("type"))
         print("Icon is None")
@@ -200,10 +204,14 @@ def gm_build_menu_icons(item):
 def gm_build_sub_menu_icons(item):
     """Builds sub-menu icons"""
     icon = item.get_inventory_value("icon_index")
+    color = item.get_inventory_value("icon_color")
+    if color is None:
+        color = "#14749a"
+        color = "green"
     if icon is not None:
         GAMEMASTER_CONSOLE_ICON_SIZE = gui_get_variable("GAMEMASTER_CONSOLE_ICON_SIZE")
         gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
-        gui_icon(f"icon_index: {icon}; color: #14749aa8;")
+        gui_icon(f"icon_index: {icon};color: {color};")
     else:
         gui_text(item.get_inventory_value("type"))
 
