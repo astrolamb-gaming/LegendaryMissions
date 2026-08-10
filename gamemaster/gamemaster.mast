@@ -99,9 +99,14 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     #     widget_list += "^comms_control"
     gui_update_widgets(widget_list,"")
 
-    jump gui_setup_2
+# TODO: None of these work
+    # await task_all(gm_sidebar, gm_map_widget, gm_nav_area_slider, data={"gm_ship":cambot, "client_id": client_id}, sub_tasks=True)
+    # await sub_task_schedule(gm_sidebar)
+    # await sub_task_schedule(gm_map_widget)
+    # await sub_task_schedule(gm_nav_area_slider)
+    # jump gm_finalize_gui
 
---- gui_setup_2
+--- gm_sidebar
 
     # Build the left bar
     # This is for the menu buttons
@@ -111,7 +116,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     # Fail-safe for if no gm_menu labels are present...
     if not len(menu_labels):
         jump gm_test_restart_button
-    sorted_menu_labels = sorted(list(menu_labels.values()), key=lambda item: item.get_inventory_value("priority"))
+    sorted_menu_labels = sorted(list(menu_labels.values()), key=lambda item: item.get_inventory_value("priority", 100))
 
     # This is the actual list box section
     with gui_sub_section():
@@ -166,7 +171,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
             # First we will make a new sub section to handle the tabs.
             tab_row = gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
             tab_section = gui_sub_section()
-            sorted_subs = sorted(list(subs.values()), key=lambda item: item.get_inventory_value("priority"))
+            sorted_subs = sorted(list(subs.values()), key=lambda item: item.get_inventory_value("priority", 1000))
 
             # Build the submenu buttons
             buttons = list()
@@ -214,7 +219,6 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         else:
             menu_panel = gss_row
         content_panels.append(gss_row)
-        # gui_hide(gss_row)
         gss_row.show(False)
 
             
@@ -226,30 +230,42 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     on change main_menu_list_box.value:
         index = sorted_menu_labels.index(main_menu_list_box.value)
         p = content_panels[index]
-        print(f"Index: {index}")
         if p is not None:
             p.show(True)
-            print(f"Showing index: {index}")
-            # gui_show(p)
-            # gui_hide(cur_panel)
             menu_panel.show(False)
             menu_panel = p
-        # gui_refresh(None)
-        # gui_rebuild(parent)
         gui_represent(contents)
-        # contents.mark_visual_dirty()
-
-                
-
 
 
 --- gm_test_restart_button
-    with gui_section("area:80,90,100,100;"):
+    with gui_section("area:80,90,95,95;"):
         b = gui_button("restart")
         on gui_message(b):
             sbs.run_next_mission("LegendaryMissionsDev")
 
+--- gm_map_widget
+    with gui_section(f"area: 0, 0, 95,95;"):
+        gui_layout_widget("science_2d_view")
+    with gui_section(f"area: 95, 0, 100, 95;"):
+        gui_layout_widget("radar_zoom_ctrl")
+
+--- gm_nav_area_slider
+    with gui_section(f"area:{info_panel_width},95,100,100;"):
+        cur = get_inventory_value(cambot, f"GAMEMASTER_lmb_SIZE", 5000)
+        s = gui_slider("low: 0; high: 100000;", var="GM_NAV_AREA_SLIDER")
+        s.value = cur
+        on change s.value:
+            cambot = sbs.get_ship_of_client(client_id)
+            cur = get_inventory_value(cambot, f"GAMEMASTER_lmb_SIZE", 5000)
+            delta = cur - s.value
+            pos = gamemaster_get_pos(cambot, "lmb")
+            gamemaster_show_nav_area(cambot, pos, delta, "Game Master", "lmb", "#040")
+
+--- gm_finalize_gui
+    # if True:
+    #     await task_schedule(gm_test_restart_button)
     await gui()
+
 
 --- gui_setup
     #comms_navigate("//comms/gamemaster")
@@ -430,8 +446,8 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         default follow_tag = False
         gui_checkbox("Follow","col-width:90px;", var="follow_tag")
         on change follow_tag:
-            ship = sbs.get_ship_of_client(client_id)
-            _sel = get_science_selection(ship)
+            cambot = sbs.get_ship_of_client(client_id)
+            _sel = get_science_selection(cambot)
             set_inventory_value(client_id, "2d_follow", follow_tag)
             science_set_2dview_focus(client_id, _sel)
         gui_row()
@@ -865,6 +881,7 @@ ship: None
 
     ->END
 
+#region Game Master Menus
 
 # NOTE: For gm menu priorities, main menu priority should be less than 100, sub menu priority should be 100 or greater.
 # This will prevent (admittedly minor) issues with the order of the main menu's default contents if it has submenus toos.
@@ -872,7 +889,7 @@ ship: None
 metadata: ``` yaml
 type: gm_menu/terrain
 icon_index: 13
-icon_color: #999872
+icon_color: "#999872"
 priority: 80 # Smaller number is higher priority
 ```
     debug_print("Terrain")
@@ -886,7 +903,7 @@ priority: 80 # Smaller number is higher priority
 metadata: ``` yaml
 type: gm_menu/terrain/asteroids
 icon_index: 54
-icon_color: #b700ff
+icon_color: "#5c3b18"
 priority: 100 # Smaller number is higher priority
 ```
     # sec = gui_sub_section()
@@ -902,13 +919,43 @@ priority: 100 # Smaller number is higher priority
 metadata: ``` yaml
 type: gm_menu/spawn
 icon_index: 156
-icon_color: #ff0000
+icon_color: "blue"
 priority: 20 # Smaller number is higher priority
 ```
     debug_print("Spawn - this should not appear")
-    gui_button("Testing Spawn")
+    gui_button("Testing Spawn", f"color: {icon_color}")
     gui_row()
     gui_blank()
+    yield success
+
+
+=== gm_menu_spawn_ships
+metadata: ```
+type: gm_menu/spawn/ships
+icon_index: 0
+```
+    gui_row("row-height: 2em;")
+    filt = gui_input("$text:filter;")
+    gui_row()
+
+    ship_list = filter_ship_data_generically(filt.value)
+
+    list_box = gui_list_box(ship_list, "", item_template=gm_ship_spawn_select_template, select=True)
+
+    on change filt.value:
+        ship_list = filter_ship_data_generically(filt.value)
+        list_box.items = ship_list
+
+    # This row shows additional details for the selected ship
+    gui_row()
+    gui_text(f"Details here....")
+    gui_row("row-height: 1em;")
+    spawn_button = gui_button("Spawn")
+    on gui_message(spawn_button):
+        sel = list_box.get_selected()
+        print("Spawning: {sel.art_id}")
+
+
     yield success
 
 
@@ -916,7 +963,7 @@ priority: 20 # Smaller number is higher priority
 metadata: ``` yaml
 type: gm_menu/selected
 icon_index: 118
-icon_color: #00ffd5
+icon_color: "#00ffd5"
 priority: 10 # Smaller number is higher priority
 ```
     debug_print("Terrain")
@@ -926,14 +973,47 @@ priority: 10 # Smaller number is higher priority
     yield success
 
 
+=== gm_old_comms_menu
+metadata: ```
+type: gm_menu/old_comms_control
+icon_index: 57
+priority: 98
+```
+    gui_row("padding: 10px,0,0,0;")
+    gui_layout_widget("comms_control")
+    yield success
+
+=== gm_old_comms_selection
+metadata: ```
+type: gm_menu/old_comms_selection
+icon_index: 34
+priority: 97
+```
+    gui_row("padding: 10px,0,0,0;")
+    gui_layout_widget("comms_sorted_list")
+    yield success
+
+=== gm_settings
+metadata: ```
+type: gm_menu/settings
+icon_index: 0
+priority: 99
+```
+    gui_row("row-height: 2em;")
+    timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
+    test_gui_text_escape = gui_text_escape("{timer}")
+    gui_text(f"$text:{test_gui_text_escape}")
+
+#endregion
+
 
 //shared/signal/game_started
     start_counter(0, "Mission_Elapsed_Time")
     
 
-//shared/signal/create_player_ships
-    for ship in role("__player__"):
-        set_data_set_value(ship, "eng_control_label", "Test", 1)
-        lbl = get_data_set_value(ship, "eng_control_label", 1)
-        print(f"Label: {lbl}")
+# //shared/signal/create_player_ships
+#     for ship in role("__player__"):
+#         set_data_set_value(ship, "eng_control_label", "Test", 1)
+#         lbl = get_data_set_value(ship, "eng_control_label", 1)
+#         print(f"Label: {lbl}")
         

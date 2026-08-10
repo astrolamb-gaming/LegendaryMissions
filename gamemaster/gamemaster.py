@@ -1,8 +1,11 @@
+from sbs_utils.procedural.gui.section import gui_sub_section
+from sbs_utils.procedural.gui.ship import gui_ship
+from sbs_utils.procedural.ship_data import get_ship_data, get_ship_data_for
 from sbs_utils.procedural.gui.button import gui_button
 from sbs_utils.procedural.gui.icon import gui_icon
 from sbs_utils.procedural.inventory import  get_inventory_value, set_inventory_value
 from sbs_utils.procedural.query import get_science_selection, get_weapons_selection, to_object, get_comms_selection
-from sbs_utils.helpers import FrameContext
+from sbs_utils.helpers import FrameContext, gui_text_escape
 from sbs_utils.vec import Vec3
 from sbs_utils import yaml
 from sbs_utils.procedural.gui.listbox import gui_list_box
@@ -189,31 +192,15 @@ def gm_build_menu_icons(item):
     """Builds the icons to press to go to each menu"""
     icon = item.get_inventory_value("icon_index")
     icon_color = item.get_inventory_value("icon_color")
-    print(f"Color: {icon_color}")
     if icon_color is None:
         icon_color = "#14749aa8"
     if icon is not None:
-        print(f"Building icon: {icon}; color: {icon_color}")
         GAMEMASTER_CONSOLE_ICON_SIZE = gui_get_variable("GAMEMASTER_CONSOLE_ICON_SIZE")
         gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
         gui_icon(f"icon_index: {icon};color: {icon_color};")
     else:
         gui_text(item.get_inventory_value("type"))
         print("Icon is None")
-
-def gm_build_sub_menu_icons(item):
-    """Builds sub-menu icons"""
-    icon = item.get_inventory_value("icon_index")
-    color = item.get_inventory_value("icon_color")
-    if color is None:
-        color = "#14749a"
-        color = "green"
-    if icon is not None:
-        GAMEMASTER_CONSOLE_ICON_SIZE = gui_get_variable("GAMEMASTER_CONSOLE_ICON_SIZE")
-        gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
-        gui_icon(f"icon_index: {icon};color: {color};")
-    else:
-        gui_text(item.get_inventory_value("type"))
 
 def sort_menu_labels(a,b):
     print("Sorting")
@@ -227,4 +214,76 @@ def sort_menu_labels(a,b):
     b1 = b.get_inventory_value("priority")
     return a1 > b1
 
+
+def filter_ship_data_generically(text):
+    """
+    Filters ship data for any usage of the provided text. Includes name, origin, side, roles, and description.
+    Args:
+        text (str): The text for which to search.
+    
+    Returns:
+        list: The list of ship keys
+    
+    """
+    data = get_ship_data()
+    if data is None:
+        return []
+
+    if text is None:
+        text = ""
+    needle = str(text).strip().lower()
+
+    # Blank search returns all known ship keys in load order.
+    if needle == "":
+        return [ship.get("key") for ship in data.get("#ship-list", []) if ship.get("key")]
+
+    results = []
+    for ship in data.get("#ship-list", []):
+        key = ship.get("key", "")
+        name = ship.get("name", "")
+        origin = ship.get("origin", "")
+        side = ship.get("side", "")
+        roles = ship.get("roles", "")
+        long_desc = ship.get("long_desc", "")
+        short_desc = ship.get("desc", "")
+
+        haystack = "|".join([
+            str(key),
+            str(name),
+            str(origin),
+            str(side),
+            str(roles),
+            str(long_desc),
+            str(short_desc),
+        ]).lower()
+
+        if needle in haystack and key:
+            results.append(key)
+
+    return results
+
+def gm_ship_spawn_select_template(item):
+    gui_row("row-height:2em;padding:13px;")
+    gui_ship(f"{item.art_id}", style="col-width:50px;padding:0,0,5px,0;")
+    dat = get_ship_data_for(item.art_id)
+    desc = "A fine ship"
+    if dat is not None:
+        desc = dat.get("name")
+        origin = dat.get("origin")
+        if origin is not None:
+            desc = f"{origin} - {desc}"
+        else:
+            desc = f"{desc}"
+        roles = dat.get("roles")
+
+    with gui_sub_section():
+        # gui_row("row-height:1em;")
+        # # Escape the user-entered ship name so a ':' or ';' in it can't inject
+        # # style properties or break the justify/font that follow (issue #569).
+        # ship_label = gui_text_escape(f"{item.name} - {item.side}")
+        # gui_text(f"$text:{ship_label};justify: left;font:gui-3;")
+        gui_row("row-height:1em;")
+        gui_text(f"$text:{desc};justify: left;font:gui-2;color:#bbb;")
+        gui_row("row-height: 1em;")
+        gui_text(f"$text: {roles};")
 
