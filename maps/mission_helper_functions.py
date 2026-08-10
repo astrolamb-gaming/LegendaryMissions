@@ -163,7 +163,7 @@ def fb_make_name(pools, kind, rng):
             + " " + _pop_rand(pools[kind], rng, "Freighter"))
 
 
-def _make_hold(pools, rng):
+def _fb_make_hold(pools, rng):
     """One Hold: a random 3-letter container code + a good popped from the trade-goods pool."""
     letters = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "M", "N",
                "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
@@ -174,8 +174,8 @@ def _make_hold(pools, rng):
 def fb_make_cargo(name, captain, stops, pools, rng, dep_time=""):
     """Build a fresh FbCargo: four active holds + four reserve holds (spares a stop-transfer swaps
     in). Draw order (4 holds, then 4 reserve) matches the old flat build, so seeds are unchanged."""
-    holds = [_make_hold(pools, rng) for _ in range(4)]
-    reserve = [_make_hold(pools, rng) for _ in range(4)]
+    holds = [_fb_make_hold(pools, rng) for _ in range(4)]
+    reserve = [_fb_make_hold(pools, rng) for _ in range(4)]
     return FbCargo(name, captain, stops, holds, reserve, dep_time)
 
 
@@ -424,3 +424,124 @@ def pr_landmark_by_key(records, key):
         if r.get("key") == key:
             return r
     return None
+
+
+def pr_job_holder(key):
+    """The first player ship holding the named job quest ACTIVE, or None.
+
+    `pr_job_active` answers "has anyone taken this?"; spawn-on-accept also needs to know
+    WHO, so a job's targets can arrive near the crew that accepted it instead of at fixed
+    coordinates. The playtest never found the gunnery range because it sat halfway across
+    the map from whoever took the job.
+    """
+    from sbs_utils.procedural.quest import quest_get_state, QuestState
+    from sbs_utils.procedural.roles import role
+    from sbs_utils.procedural.query import to_object_list
+    for p in to_object_list(role("__player__")):
+        if quest_get_state(p.id, key) == QuestState.ACTIVE:
+            return p
+    return None
+
+
+def pr_job_spawn_center(key, ahead, fx, fy, fz):
+    """Where to put a job's targets: `ahead` units in front of the crew that accepted it.
+
+    Falls back to the authored fixed point (fx, fy, fz) when nobody holds the job or the
+    ship has no usable heading, so a job always has somewhere to put its objects.
+
+    Relative placement also matters in multiplayer: each crew's work arrives near THEM
+    rather than every job piling into one corner of the map.
+    """
+    from sbs_utils.vec import Vec3
+    from sbs_utils.procedural.query import to_engine_object
+    holder = pr_job_holder(key)
+    if holder is None:
+        return Vec3(fx, fy, fz)
+    eo = to_engine_object(holder.id)
+    if eo is None:
+        return Vec3(fx, fy, fz)
+    try:
+        return eo.pos + (eo.forward_vector() * ahead)
+    except Exception:
+        return Vec3(fx, fy, fz)
+
+
+def pr_job_holders(key):
+    """EVERY player ship holding this job ACTIVE.
+
+    `pr_job_holder` is the first one, which is what spawn-on-accept wants. A watcher that
+    scores per ship wants all of them, and named for the flat-job case so a reader of
+    pr_picket_watch is not sent looking for a multi-step arc that does not exist.
+    """
+    return pr_arc_holders(key)
+
+
+def pr_landmark_field(records, key, field, default=None):
+    """One extra fence field off an AMD landmark record, e.g. `Radius:`.
+
+    `pr_landmark_by_key` answers "which record"; the mission-specific facts an author
+    hangs on it live in the raw fence, which landmarks_from_section carries under `data`.
+    """
+    rec = pr_landmark_by_key(records, key)
+    if rec is None:
+        return default
+    data = rec.get("data") or {}
+    value = data.get(field) if hasattr(data, "get") else None
+    return default if value is None else value
+
+
+def pr_picket_count(x, y, z, radius, ship=0, coop=False):
+    """Live defense TOWERS standing inside a zone that count for `ship`.
+
+    ANY TURRET KIND COUNTS - beam, heavy or drone, it is a gun on the chokepoint either
+    way - so this filters on position, side and ownership and never on hull or prefab.
+    A new tower kind works here the day it is authored.
+
+    Towers only: a bolted MOUNT rides its host around and is not an emplacement, so it
+    cannot be flown into the zone to satisfy a picket.
+
+    Ownership follows the map's existing generosity. An UNOWNED tower (mission hardware,
+    GM-placed) counts for everybody, the same way every peacetime watcher treats an
+    unclaimed target. In an owned QUEST_MODE a tower belonging to another ship does not
+    count for this one, so two crews working the same junction each score their own
+    hardware rather than splitting one pile. Co-op counts everything for everyone.
+    """
+    from sbs_utils.procedural.turret import turret_all, turret_is
+    from sbs_utils.procedural.mount import mount_is
+    from sbs_utils.procedural.query import to_id, to_object
+    from sbs_utils.procedural.inventory import get_inventory_value
+    sid = to_id(ship) or 0
+    holder = to_object(sid) if sid else None
+    want_side = getattr(holder, "side", None) if holder is not None else None
+    r2 = float(radius) * float(radius)
+    found = 0
+    for tid in turret_all():
+        if not turret_is(tid) or mount_is(tid):
+            continue
+        obj = to_object(tid)
+        if obj is None:
+            continue
+        if want_side and getattr(obj, "side", None) != want_side:
+            continue
+        owner = get_inventory_value(tid, "turret:owner", 0) or 0
+        if owner and sid and not coop and owner != sid:
+            continue
+        pos = obj.pos
+        dx, dy, dz = pos.x - x, pos.y - y, pos.z - z
+        if dx * dx + dy * dy + dz * dz <= r2:
+            found += 1
+    return found
+
+
+def pr_salvage_award(ship, units):
+    """Add fabrication salvage to a ship's hold.
+
+    Salvage is stored per-ship under the plain inventory key "salvage" - the same key an
+    item pickup credits and the Fabricator spends (LegendaryMissions/fabrication). So a
+    mission granting it directly, a wreck cache and a station purchase all land in one
+    place and need no reconciliation.
+    """
+    from sbs_utils.procedural.inventory import get_inventory_value, set_inventory_value
+    from sbs_utils.procedural.query import to_id
+    sid = to_id(ship)
+    set_inventory_value(sid, "salvage", get_inventory_value(sid, "salvage", 0) + int(units))

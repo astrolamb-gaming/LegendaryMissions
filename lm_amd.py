@@ -30,14 +30,21 @@ def _declare_lm_vocabulary():
         "hook": text(hint="the label/signal that stages the encounter"),
     }, domain="LegendaryMissions")
 
-    # A character's radio handle - what the crew hears, distinct from `Display`.
-    amd_register_fields("lifeform", {
-        "call sign": text(hint="Ghost, Bitters, NightSky"),
+    # How close counts as "at" a landmark. A landmark that names a ZONE rather than a
+    # spot - a picket, a patrol box, a no-fly area - needs its size where its position
+    # is. A radius kept in the mast instead would be a second place to edit one fact,
+    # and the two would drift the first time somebody moved the zone.
+    amd_register_fields("landmark", {
+        "radius": integer(hint="2500 - how close to Loc counts as inside the zone"),
     }, domain="LegendaryMissions")
 
-    # What a tip-off PAYS OUT in words: the line shown once the intel proves true.
+    # `Call sign:` and `Intel:` are NOT here. They belong to the casino, which is the
+    # only place either word appears (casino/bar.amd), and which ships as an addon a
+    # mission can take WITHOUT this file. Declaring them in both places is what made
+    # `AMD field 'call sign' is already declared ... with a different meaning` a live
+    # startup error the day anything loaded both - the hints had drifted apart.
+    # ONE OWNER PER CONCEPT: see casino/casino_amd.py.
     amd_register_fields("dialogue", {
-        "intel": multiline(hint="the payoff line when the tip checks out"),
         "lines": text(hint="a named set of barks this scene draws from"),
     }, domain="LegendaryMissions")
 

@@ -18,6 +18,7 @@
 ## [Florbin Case](florbin_case)
 
 ### [The Florbin Affair](florbin)
+= The spine of the map. Four steps, each one a different console's problem.
 ---
 Arc
 Scope: shared
@@ -26,6 +27,7 @@ Starts when: at once
 Ambassador Florbin has been kidnapped and smuggled out in a cargo container. Follow the cargo trail, find him, and bring him home to DS 1 - alive.
 
 #### [Take the Case](brief)
+= Opening. Comms hails DS 1; nothing else is revealed until this lands.
 ---
 Scope: shared
 Starts when: at once
@@ -35,6 +37,7 @@ Then: reveal florbin/trail
 Contact DS 1 to open the investigation.
 
 #### [Identify the Kidnapper](trail)
+= Midpoint. Science work - the crew learns Florbin is alive and aboard.
 ---
 Scope: shared
 Starts when: revealed
@@ -44,6 +47,7 @@ Then: reveal florbin/subdue
 Follow the cargo trail: interview stations and bio-scan suspect holds to find which ship is hiding the ambassador.
 
 #### [Subdue the Kidnapper](subdue)
+= The trap. Weapons must NOT solve this the usual way; that is the whole beat.
 ---
 Scope: shared
 Starts when: revealed
@@ -53,6 +57,7 @@ Then: reveal florbin/recover
 Do NOT destroy the ship - the ambassador is aboard. Drop its shields below 50% (or use a secret codecase) to force its surrender.
 
 #### [Recover and Return Florbin](recover)
+= Payoff. Helm and docking; deliberately quiet after the standoff.
 ---
 Scope: shared
 Starts when: revealed
@@ -61,6 +66,7 @@ Done when: signal florbin_delivered
 Collect the escape pod and dock it at DS 1.
 
 #### [Keep Florbin Alive](alive)
+= The stake, running underneath all four steps. Never listed as a task.
 ---
 Scope: shared
 Starts when: at once
@@ -81,7 +87,7 @@ On complete: toast Job complete: Gunnery Qualification
 Done when: signal 5 drone_down
 Reward: 200 credits
 ---
-Weapons drill: destroy all the target drones.
+Weapons drill: destroy all the condemned hulks on the gunnery range.
 
 ### [Rock Breakers](job_rocks)
 ---
@@ -91,7 +97,7 @@ On complete: toast Job complete: Rock Breakers
 Done when: signal 4 rock_cleared
 Reward: 150 credits
 ---
-Clear the hazard asteroids from the shipping lane.
+Clear the hazard asteroids from the shipping lane. The field is marked on the map as Hazard Rock Field - Science can select the marker at its centre to put the crew on it.
 
 ### [Board the Poacher](job_poacher)
 ---
@@ -102,7 +108,7 @@ Done when: signal poacher_boarded
 Fail on signal: poacher_killed
 Reward: 300 credits
 ---
-Disable the unregistered trawler (drop its shields below 50%) and demand its surrender. Do NOT destroy it.
+The trawler J19 Jenny is working the belt unregistered. Disable her (drop her shields below 50%) and demand her surrender. Do NOT destroy her.
 
 ### [Mercy Run](job_mercy)
 ---
@@ -111,6 +117,8 @@ On accept: toast Job accepted: Mercy Run
 On complete: toast Job complete: Mercy Run
 Done when: signal mercy_reached
 Fails when: 6 minutes
+Speaker: mercy_lm
+Signal says: MAYDAY - AUTOMATED BEACON. LIFE SUPPORT {time} FROM FAILURE.
 Reward: 250 credits
 Penalty: 100 credits
 ---
@@ -124,7 +132,7 @@ On complete: toast Job complete: Customs Patrol
 Done when: signal 4 customs_cleared
 Reward: 120 credits
 ---
-Hail and clear the civilian traders for transit.
+Hail and clear the civilian traders for transit. They keep to the Shipping Lane, marked on the map.
 
 ### [Anomaly Survey](job_survey)
 ---
@@ -149,7 +157,7 @@ On complete: toast Job complete: Sensor Net
 Done when: signal 3 sensor_deployed
 Reward: 220 credits
 ---
-Establish a sensor picket. Have Engineering fabricate Sensor Beacons on the Fabricate tab and deliver them to Weapons, then deploy three across the patrol lanes.
+Establish a sensor picket. Each Sensor Beacon costs 8 salvage: tow a hulk to the Refinery Platform and it pays out in processed material, or shoot open a wreck and collect the cache. A station market will sell you salvage too, at a price. Engineering fabricates the beacons on the Fabricate tab and delivers them to Weapons, who deploys three across the patrol lanes.
 
 ### [Recover Lost Probes](job_probes)
 ---
@@ -169,7 +177,7 @@ On complete: toast Job complete: Clear the Grazing Herd
 Done when: signal herd_cleared
 Reward: 180 credits
 ---
-A pod of grazers has drifted into a shipping lane. Do NOT fire on them - they turn hostile if provoked. Fabricate a Bio Beacon set to REPEL grazers, deploy it among the pod, and drive them clear.
+A pod of grazers has drifted into a shipping lane. Do NOT fire on them - they turn hostile if provoked. A Bio Beacon costs 5 salvage and 1 bio sample. Salvage comes from the Refinery Platform, from wrecks, or from a station market; a bio sample is recovered from a dead space creature - a station will sell you one if the lane is quiet. Set the beacon to REPEL grazers, deploy it among the pod, and drive them clear.
 
 ### [Bait the Ravener](job_ravener)
 ---
@@ -179,7 +187,7 @@ On complete: toast Job complete: Bait the Ravener
 Done when: signal predator_baited
 Reward: 350 credits
 ---
-A Ravener is loose in the lanes. It FEEDS on weapon fire - shooting only heals it - so do not engage. Fabricate a Bio Beacon set to ATTRACT the ravener, deploy it beside the black hole, and let the hole do the rest.
+A Ravener is loose in the lanes. It FEEDS on weapon fire - shooting only heals it - so do not engage. A Bio Beacon costs 5 salvage and 1 bio sample (see Salvage Sweep, or open a wreck). Set it to ATTRACT the ravener, deploy it beside the black hole, and let the hole do the rest.
 
 // ---- Grav-tether haul jobs. Non-combat "collect & deliver" work for the tractor beam: tow a
 // dead-in-space barge home, and haul salvage hulks to the refinery. Weapons hold-clicks the
@@ -204,7 +212,7 @@ On complete: toast Job complete: Salvage Sweep
 Done when: signal 3 salvage_delivered
 Reward: 240 credits
 ---
-Wrecked hulls are cluttering the lane. Grav-tether each salvage hulk and tow it to the Refinery Platform for processing.
+Wrecked hulls are cluttering the lane. Grav-tether each salvage hulk and tow it to the Refinery Platform for processing - the refinery pays in credits AND in salvage, which is what Engineering's Fabricator runs on.
 
 ### [Rescue the Lifepod](job_lifepod)
 ---
@@ -227,6 +235,21 @@ Done when: signal relay_placed
 Reward: 200 credits
 ---
 A comms relay has drifted off station. Grav-tether it and tow it to its marked position in the lane, then let it settle.
+
+// The goal COUNT lives here, not in the mast: pr_jobs_setup reads it back out (job_counts)
+// to decide how many kit crates to drop, so the crates and the target are the same number
+// by construction and cannot drift when density scaling changes one of them.
+// No Objective: - the quest log already renders "2 of 3" from progress/need, and prose
+// naming "3" would go stale at every other density.
+### [Picket Line](job_picket)
+---
+Job
+On accept: toast Job accepted: Picket Line
+On complete: toast Job complete: Picket Line
+Done when: signal 3 picket_placed
+Reward: 320 credits
+---
+DS 1 wants the lane junction covered by automated guns. Fleet drops turret kits alongside you - grav-tether each crate, tow it into the marked Picket Line zone, release it, and unfold it there. Any turret kind counts; a kit deployed outside the zone does not. The picket is only finished while the guns are still standing.
 
 // ---- Multi-step jobs: one board entry that runs a guided sequence across several consoles
 // (dispatch info-cards prompt each step). Completion is the final signal; getting there needs
@@ -430,9 +453,28 @@ Tab: bio
 
 // ---- Fixed-position job objects (the poacher trawler + the stranded shuttle). Explicit Loc
 // (single system). The scattered drones/rocks/traders/anomalies stay in pr_jobs_setup.
+// ---- What a kill leaves behind, keyed by role. Without a table the library default
+// applies (a random trade good), which is how condemned hulks came to drop contraband on
+// a live-fire range - they are spawned hostile so Weapons can lock them (PRM-14).
+## [Drops](drops)
+
+### [Condemned Hulk](target_drone)
+---
+Drops: none
+---
+Practice targets on a gunnery range. Already stripped - they carry nothing worth taking.
+
+### [Raider](raider)
+---
+Drops: salvage x1-3, contraband 15%
+---
+A working raider: parts worth reclaiming, and now and then something it should not have
+been carrying.
+
+
 ## [Landmarks](landmarks)
 
-### [Unregistered Trawler](poacher_lm)
+### [J19 Jenny](poacher_lm)
 ---
 Kind: npc
 Side: civ
@@ -448,6 +490,19 @@ Side: civ
 Roles: civilian, mercy_target
 Art: cargo_ship
 Loc: 16000, 0, -12000
+---
+
+// A ZONE, not an object: no Art:, so landmark_spawn places nothing and this record is a
+// pure position the mission reads with landmark_pos. A physical buoy at a chokepoint
+// would get shot, tethered, or mistaken for the thing you were sent to guard.
+// Radius 2500 is prefab_lm_turret_tower's own acquisition range, so a turret anywhere
+// inside the ring actually covers the junction it is standing in.
+### [Picket Line](picket_lm)
+---
+Kind: point
+Roles: picket_zone
+Radius: 2500
+Loc: -2000, 0, 18000
 ---
 
 // ---- The Florbin cargo ships' flavor scans (suspect/discovered), rendered by the generic
@@ -570,6 +625,39 @@ Face: ter #523b3f 0 0;ter #523b3f 2 0;ter #523b3f 5 2;ter #5d0463 7 4 6 -2;ter #
 Roles: fb_vip
 ---
 The kidnapped ambassador - more concerned about missing his shows than the danger.
+
+// Once aboard he is a passenger with opinions. This used to be a hand-written task loop
+// (fb_pest_messages) reading a separate ## Florbin Complaints pool; it is the same
+// behavior as data now - every 3-5 minutes at random, until he is handed over at DS 1 -
+// and his lines live here, on the urge that says them, instead of in a pool one label
+// away. `Every: 3-5m` keeps the original's jitter: an exact interval reads as a machine.
+#### [Passenger requests](florbin_pest)
+---
+Urge
+Every: 3-5m
+Title: Passenger Request
+Until: has role fb_delivered
+---
+% I really hate to bother you but... could you possibly ask the captain if there are any other passenger suites available? Maybe something a little further from the engine room? Unfortunately, this one is right next to a bulkhead, and I'm very sensitive to certain vibrations. If there aren't any other suites available, perhaps you could ask the Chief Engineer to recalibrate the inertial dampeners?
+% Could you please let the Captain know that there appears to be some problem with the galley? I keep paging room service, but nobody is answering!
+% I'm not sure if this is really a serious problem, but there really is this horrible smell coming out of one of the vents in my quarters. Burning plastic or ozone or something, but it's really very strong. Could you send an engineering team to my quarters and see if they can get rid of the smell?
+% This is a very minor issue, I mean, not something you should bother the Captain with, but if it's not too much trouble, the drain for the sink in my bathroom isn't draining properly. I mean, it's a little slow... like, clogged a little bit but not all the way. Could you let maintenance know about it?
+% Are there any decent dry cleaners on this ship? I tried asking the Supply Officer, but he was very rude to me! Could you please let the Captain know so a reprimand or something could be issued?
+% I need more pillows. I tried asking the Supply Officer for more pillows, but he said there's something about a Navy regulation that you can't have more than two pillows per bed? But I am clearly not a Navy service-person! He gave me this DD Form 1348, but I have no idea how to fill this out. What is a DODAAC? Why do I need one to get more pillows? Can you just tell the captain to send somebody with more pillows?
+% The lights in my quarters are too bright, and the dimmer control isn't working. At least I think it's the dimmer control? None of the environmental controls are labeled, which is very confusing. I would think on a Navy ship there would be some sort of regulation about that? Next time I talk to the Fleet Admiral, I'm definitely going to mention that. But the lights are still too bright, and I get migraines. So could you send maybe a maintenance crew to replace the lights, or just dim them a little?
+% Ok, well, this is new... the lights in my quarters are now flickering, and I really, really do not want to get a migraine now. I don't want to make a fuss about this, but I've been told that I can be really, really unpleasant when I get a migraine. I guess I could turn the lights off, but that sort of defeats the whole purpose of having lights, doesn't it? Could you send maintenance down to look at the lights as soon as possible?
+% Well, I'm not sure if this is important, but if you remember I mentioned the thing about vibrations earlier, so I was moving the bed away from the bulkhead, and I noticed there was a stain on the wall behind the bed. At first I thought it was blood, which would be really weird, because why would a bulkhead be bleeding, but I looked closer, and it was still wet, so I think maybe it was rust? Is that normal? I mean, a bulkhead rusting. Is that something that could be dangerous? Could you send someone from engineering up to take a look at this?
+% There's a hissing noise coming from the vent in my quarters. Which I guess could be normal, because it's a vent, so maybe it's supposed to be doing that? But I think it's getting louder. I guess it's maybe not something I should bother maintenance with, but if they're not really busy, maybe could you send someone to check the vent?
+% I know you're probably busy, but this is really somewhat urgent. I could really use more towels. Quite a few more towels. Also, this isn't really related, but the shower in my suite keeps overflowing. I guess that's really a separate request. But if you could please send more towels at your earliest possible convenience, I would greatly appreciate that.
+% The door controls to my quarters appear to be malfunctioning. It won't open. Do I need to remind the Captain that as the Terran Ambassador, I have diplomatic immunity, and any attempt to confine an Ambassador or restrict their free movement while on a diplomatic mission is against the Eridani Treaty of 2214. I do not want to lodge a formal complaint or escalate this into an official incident but -- Wait, the door opened. Never mind.
+% The door to my quarters keeps sticking. I mean, I can still open or close it, but sometimes it gets stuck, and you really have to shove it to get it to move. I think that's a safety issue? I mean, what if there's an emergency and I can't get out of my quarters. Do I need to report this to a safety officer or is this something that maintenance handles? Maybe it needs some oil or grease?
+% Would it be possible, if they aren't being used for anything, to power down the ship's shields? I mean, obviously, if we're in combat, leave them up, but if we're not, maybe shut them down for a little bit? I think they might be interfering with my holovid reception.
+% The temperature in my quarters is too cold. I tried changing the thermostat settings, but I'm not sure the temperature sensors are working correctly, because the thermostat says the temperature is 25 degrees, and there's just no way that can be correct. It certainly doesn't feel like 25 degrees. Maybe the thermostat is broken? Can you send someone from maintenance to check the thermostat?
+% The temperature in my quarters is too warm. I thought the thermostat was broken, so I turned it up to 30 degrees, but somehow I think it got locked there and now I can't turn it down. Is there a security code or something to unlock the thermostat? Can you adjust the temperature remotely, or do you have to send someone from maintenance to do that?
+% Hello? Is this intercom working? What deck am I on? I was told there was a gymnasium down this hallway, but all of these doors are locked and my security code isn't working. Also, why would the gymnasium be behind a door with a radiation warning? Why isn't there a directory or map available? Can you give me directions to the gymnasium?
+% Sorry to bother you, but I have one very small, minor request. If you're not busy with something else, could you please send a roasted brontosquid banquet dinner to my suite? And formal dinnerware and silverware for a party of eight. Oh, and napkins! Don't forget the napkins!
+% Yes, room service? I'd like to order a Cobb salad, with avacado if you have it. And a bottle of wine. Do you have a wine list? Do you have anything sweet, like a shiraz or zinfandel? Do you have any marshmallows or chocolate? And bread. What kind of bread? Do you have any sourdough or ciabatta? What? I have no idea, I was trying to call room service. Can you transfer me to the galley?
+% Well, this is going to sound a little odd, but... How do I put this? Ok, let me try it this way. Is there a way that I could request something, but it's not actually a request? Not quite an implied interrogative, but very, very close to that. Do you know what I mean?
 
 // ---- The investigation's authored prose, as declarative templates. florbin_case.mast loads this
 // section into FB_TEXT and fills the {slots} at send time (comms_receive interpolates from task
@@ -718,27 +806,3 @@ The captain's nickname in high school was Banana Slug.
 ### [Empty](empty_20)
 The captain's nickname in high school was Knuckle Sandwich.
 
-// Ambassador Florbins post-rescue passenger requests, as a chatter line-pool (amd_chatter):
-// one scene whose body lines ARE the pool. chatter_line(scenes, complaint) picks one.
-## [Florbin Complaints](florbin_complaints)
-### [Passenger Request](complaint)
-% I really hate to bother you but... could you possibly ask the captain if there are any other passenger suites available? Maybe something a little further from the engine room? Unfortunately, this one is right next to a bulkhead, and I'm very sensitive to certain vibrations. If there aren't any other suites available, perhaps you could ask the Chief Engineer to recalibrate the inertial dampeners?
-% Could you please let the Captain know that there appears to be some problem with the galley? I keep paging room service, but nobody is answering!
-% I'm not sure if this is really a serious problem, but there really is this horrible smell coming out of one of the vents in my quarters. Burning plastic or ozone or something, but it's really very strong. Could you send an engineering team to my quarters and see if they can get rid of the smell?
-% This is a very minor issue, I mean, not something you should bother the Captain with, but if it's not too much trouble, the drain for the sink in my bathroom isn't draining properly. I mean, it's a little slow... like, clogged a little bit but not all the way. Could you let maintenance know about it?
-% Are there any decent dry cleaners on this ship? I tried asking the Supply Officer, but he was very rude to me! Could you please let the Captain know so a reprimand or something could be issued?
-% I need more pillows. I tried asking the Supply Officer for more pillows, but he said there's something about a Navy regulation that you can't have more than two pillows per bed? But I am clearly not a Navy service-person! He gave me this DD Form 1348, but I have no idea how to fill this out. What is a DODAAC? Why do I need one to get more pillows? Can you just tell the captain to send somebody with more pillows?
-% The lights in my quarters are too bright, and the dimmer control isn't working. At least I think it's the dimmer control? None of the environmental controls are labeled, which is very confusing. I would think on a Navy ship there would be some sort of regulation about that? Next time I talk to the Fleet Admiral, I'm definitely going to mention that. But the lights are still too bright, and I get migraines. So could you send maybe a maintenance crew to replace the lights, or just dim them a little?
-% Ok, well, this is new... the lights in my quarters are now flickering, and I really, really do not want to get a migraine now. I don't want to make a fuss about this, but I've been told that I can be really, really unpleasant when I get a migraine. I guess I could turn the lights off, but that sort of defeats the whole purpose of having lights, doesn't it? Could you send maintenance down to look at the lights as soon as possible?
-% Well, I'm not sure if this is important, but if you remember I mentioned the thing about vibrations earlier, so I was moving the bed away from the bulkhead, and I noticed there was a stain on the wall behind the bed. At first I thought it was blood, which would be really weird, because why would a bulkhead be bleeding, but I looked closer, and it was still wet, so I think maybe it was rust? Is that normal? I mean, a bulkhead rusting. Is that something that could be dangerous? Could you send someone from engineering up to take a look at this?
-% There's a hissing noise coming from the vent in my quarters. Which I guess could be normal, because it's a vent, so maybe it's supposed to be doing that? But I think it's getting louder. I guess it's maybe not something I should bother maintenance with, but if they're not really busy, maybe could you send someone to check the vent?
-% I know you're probably busy, but this is really somewhat urgent. I could really use more towels. Quite a few more towels. Also, this isn't really related, but the shower in my suite keeps overflowing. I guess that's really a separate request. But if you could please send more towels at your earliest possible convenience, I would greatly appreciate that.
-% The door controls to my quarters appear to be malfunctioning. It won't open. Do I need to remind the Captain that as the Terran Ambassador, I have diplomatic immunity, and any attempt to confine an Ambassador or restrict their free movement while on a diplomatic mission is against the Eridani Treaty of 2214. I do not want to lodge a formal complaint or escalate this into an official incident but -- Wait, the door opened. Never mind.
-% The door to my quarters keeps sticking. I mean, I can still open or close it, but sometimes it gets stuck, and you really have to shove it to get it to move. I think that's a safety issue? I mean, what if there's an emergency and I can't get out of my quarters. Do I need to report this to a safety officer or is this something that maintenance handles? Maybe it needs some oil or grease?
-% Would it be possible, if they aren't being used for anything, to power down the ship's shields? I mean, obviously, if we're in combat, leave them up, but if we're not, maybe shut them down for a little bit? I think they might be interfering with my holovid reception.
-% The temperature in my quarters is too cold. I tried changing the thermostat settings, but I'm not sure the temperature sensors are working correctly, because the thermostat says the temperature is 25 degrees, and there's just no way that can be correct. It certainly doesn't feel like 25 degrees. Maybe the thermostat is broken? Can you send someone from maintenance to check the thermostat?
-% The temperature in my quarters is too warm. I thought the thermostat was broken, so I turned it up to 30 degrees, but somehow I think it got locked there and now I can't turn it down. Is there a security code or something to unlock the thermostat? Can you adjust the temperature remotely, or do you have to send someone from maintenance to do that?
-% Hello? Is this intercom working? What deck am I on? I was told there was a gymnasium down this hallway, but all of these doors are locked and my security code isn't working. Also, why would the gymnasium be behind a door with a radiation warning? Why isn't there a directory or map available? Can you give me directions to the gymnasium?
-% Sorry to bother you, but I have one very small, minor request. If you're not busy with something else, could you please send a roasted brontosquid banquet dinner to my suite? And formal dinnerware and silverware for a party of eight. Oh, and napkins! Don't forget the napkins!
-% Yes, room service? I'd like to order a Cobb salad, with avacado if you have it. And a bottle of wine. Do you have a wine list? Do you have anything sweet, like a shiraz or zinfandel? Do you have any marshmallows or chocolate? And bread. What kind of bread? Do you have any sourdough or ciabatta? What? I have no idea, I was trying to call room service. Can you transfer me to the galley?
-% Well, this is going to sound a little odd, but... How do I put this? Ok, let me try it this way. Is there a way that I could request something, but it's not actually a request? Not quite an implied interrogative, but very, very close to that. Do you know what I mean?

@@ -133,10 +133,21 @@ hangar_get_craft_data("terran")
         crafts = hangar_get_crafts_at(dock_choice)
 
     if len(crafts)>0:
+        # NOTE the `else: ride_choice = None` that used to live here cleared the
+        # selection whenever it was VALID - inverted, and a large part of why craft
+        # selection had "no consistent pattern" on re-entry: every rebuild dropped a
+        # good selection and the next one re-derived a different default.
         if ride_choice not in crafts:
-            ride_choice = crafts[0]
-        else:
-            ride_choice = None
+            # Nothing valid selected. Prefer the craft this client last FLEW (the rule
+            # chosen for PRM-28), so coming back from a sortie re-selects what you were
+            # in; fall back to the first in the list when it is gone - destroyed, or now
+            # at another dock. Picking a craft by hand still wins, because that sets
+            # ride_choice and this branch only runs when there is nothing valid.
+            last_flown = to_space_object(get_inventory_value(client_id, "hangar_last_flown", None))
+            if last_flown is not None and last_flown in crafts:
+                ride_choice = last_flown
+            else:
+                ride_choice = crafts[0]
     
 
     # Persist the (possibly reset) selection back as ids for the next rebuild.
@@ -290,7 +301,9 @@ hangar_get_craft_data("terran")
         jump show_hangar
 
     gui_section(style="area: 0,100-90px, 35,100;")
-    gui_layout_widget("text_waterfall")
+    # The text waterfall is gone (LOG_PANEL_PLAN.md) - it could not be styled from script.
+    # gui_log_tail() is the same traffic in a text area this console owns.
+    gui_log_tail()
     #
     # Fighter stats
     #
@@ -310,6 +323,13 @@ hangar_get_craft_data("terran")
 
     gui_section(style="area: 75,100-50px, 100,100;")
     on gui_message(gui_button("Launch")):
+        # Capture the selection BEFORE deciding anything. This page is a rebuild loop, so
+        # any path back to show_hangar without hints resets all three lists to their first
+        # screenful. The button's own bail-out captured, but launch_to_cockpit refuses in
+        # three more places (no ride, not in standby, hangar_launch_craft says no) and
+        # captured in none of them - so pressing Launch on a craft still in REFIT silently
+        # moved the player's selection. Capturing here covers every route out.
+        hangar_hints = hangar_hints_capture(dock_picker, ride_picker, quest_box)
         ride_select = to_space_object(ride_choice_id)
         if ride_select is not None:
             old_ship_id = sbs.get_ship_of_client(client_id)
@@ -318,7 +338,6 @@ hangar_get_craft_data("terran")
             if quest_choice is not None and HANGAR_QUEST_DOC is not None:
                 hangar_assign_quest(to_id(ride_select), HANGAR_QUEST_DOC, cockpit_type, quest_choice)
             jump launch_to_cockpit
-        hangar_hints = hangar_hints_capture(dock_picker, ride_picker, quest_box)
         jump show_hangar
 
 
@@ -384,6 +403,9 @@ hangar_get_craft_data("terran")
     jump show_hangar if not hangar_launch_craft(to_id(ride_select), client_id)
 
     sbs.assign_client_to_ship(client_id,to_id(ride_select))
+    # Remember what we flew, so the hangar re-selects it when this client comes back
+    # (PRM-28). Stored per CLIENT, not per ship: it is that player's seat that returns.
+    set_inventory_value(client_id, "hangar_last_flown", to_id(ride_select))
     set_inventory_value(ride_select, "client_id", client_id)
     set_dedicated_link(client_id, "craft_id", ride_select)
     sbs.send_grid_selection_info(ride_select.id, "", "white", "")
@@ -400,7 +422,11 @@ hangar_get_craft_data("terran")
     gui_activate_console("cockpit")
 
     gui_section(style="area:0,0,100,100;")
-    gui_image_stretch(get_mission_dir_filename("media/LegendaryMissions/hangar/cockpit_overlay"))
+    # media_shared, not get_mission_dir_filename: it resolves the mission's own media/ OR
+    # the unpacked shared pack, whichever has the art. The hardcoded path here said
+    # "media/LegendaryMissions/hangar/..." and broke when 257a00b flattened the source
+    # ("art lives once"), leaving IMAGE NOT FOUND with the mission name doubled in it.
+    gui_image_stretch(media_shared("hangar/cockpit_overlay"))
 
     gui_section(style="area: 0,11,100,105;")
     gui_layout_widget("3dview")
@@ -421,7 +447,9 @@ hangar_get_craft_data("terran")
     gui_layout_widget("helm_free_3d")
 
     gui_section(style="area: 41,90,59.7,99;")
-    gui_layout_widget("text_waterfall")
+    # The text waterfall is gone (LOG_PANEL_PLAN.md) - it could not be styled from script.
+    # gui_log_tail() is the same traffic in a text area this console owns.
+    gui_log_tail()
 
     # Register ship_data in the console widget list (no visible HUD slot). The
     # engine only renders a widget that's in the list send_client_widget_list
@@ -472,22 +500,11 @@ hangar_get_craft_data("terran")
 --- hangar_grav_tether
     _ship_id = sbs.get_ship_of_client(client_id)
     ->END if _ship_id is None or _ship_id==0
-    # Toggle: second press releases whatever this fighter is tethered to.
-    if grav_tether_involves(_ship_id):
-        grav_tether_release_any(_ship_id)
-        ->END
-    # Nose-aim: nearest tetherable object in the fighter's forward cone (no engine
-    # raycast exists; closest_in_front cone-filters closest). Pick the mode by role.
-    _cd = closest_in_front(_ship_id, any_role("__npc__,item,upgrade,station,asteroid"), max_dist=8000, cone_deg=40)
-    ->END if _cd is None
-    _tid = _cd.id
-    if has_any_role(_tid, "item,upgrade"):
-        grav_tether_reel(_ship_id, _tid)
-    else:
-        if has_any_role(_tid, "asteroid"):
-            grav_tether_swing(_tid, _ship_id, 800)
-        else:
-            grav_tether_tow(_ship_id, _tid, 500)
+    # The whole interaction lives in the grav_tether addon (lm_tether_press): toggle to
+    # release, act at once when the target says what to do, otherwise synthesize the
+    # //popup/tether menu on what the nose found. Keeping it there rather than here means
+    # the button and the popup cannot drift apart, and the cockpit owns only its console.
+    lm_tether_press(_ship_id)
     ->END
 
 

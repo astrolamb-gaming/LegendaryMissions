@@ -59,6 +59,10 @@ DOCKING:
     torps_delay: 6
     interior_delay: 2
     interior_count: 2
+    # Gas giant orbit. Not a refit - shields only, and slowly.
+    giant_shield_delay: 6
+    giant_shield_coeff: 0.5
+    giant_orbit_speed: 120
 
 # Color theme for engineering
 # see grid_theme.json
@@ -121,4 +125,8 @@ PLAYER_LIST:
         ship: "tsn_battle_cruiser"
         face: "terran"
 
-
+# Dev/attract only: job-board keys to ACCEPT automatically at map setup.
+# A job normally goes active only when a human presses Accept on the quest tab, so a
+# headless --test run can never reach a job's spawn case or its watcher. Listing keys
+# here (e.g. [job_picket]) makes the board testable without a crew. Leave empty to ship.
+AUTO_ACCEPT_JOBS: []

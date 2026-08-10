@@ -22,11 +22,10 @@
         "artemis-sbs.LegendaryMissions.side_missions.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.upgrades.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.quests.v1.4.0.mastlib",
-        "artemis-sbs.LegendaryMissions.admiral.v1.4.0.mastlib",
-        "artemis-sbs.LegendaryMissions.admiral_comms.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.gamemaster.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.gamemaster_comms.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.prefabs.v1.4.0.mastlib",
+        "artemis-sbs.LegendaryMissions.turrets.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.biomech.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.basic_player_destroy.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.basic_random_skybox.v1.4.0.mastlib",
@@ -37,7 +36,8 @@
         "artemis-sbs.LegendaryMissions.documents.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.lm_lore.v1.4.0.mastlib",
         "artemis-sbs.LegendaryMissions.director.v1.4.0.mastlib",
-        "artemis-sbs.LegendaryMissions.avatar_editor.v1.4.0.mastlib"
+        "artemis-sbs.LegendaryMissions.avatar_editor.v1.4.0.mastlib",
+        "artemis-sbs.LegendaryMissions.races.v1.4.0.mastlib"
     ],
     "shared_media": [
         "artemis-sbs.LegendaryMissions.media.v1.4.0.zip"

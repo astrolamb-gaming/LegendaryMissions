@@ -1,0 +1,34 @@
+ship: pirate_longbow
+layout: default
+size: 15x15
+legend:
+  g: gun-deck / system,weapon,beam
+  t: tube-deck / system,weapon,torpedo
+  f: fwd-shield
+  a: aft-shield
+  s: sensors
+  b: crew-berths / room,cabin,quarters
+  c: captains-cabin / room,cabin,vip
+  y: surgery / room,med,sickbay
+  r: brig
+  m: maneuver
+  p: plunder-hold / room,bay,cargo
+  i: impulse
+  w: warp
+  o: boat-bay / room,bay,shuttle
+---
+       g       
+       t       
+      fsf      
+      b.b      
+     b.c.b     
+     y.c.y     
+     r...r     
+     pp.pp     
+    ppp.ppp    
+ mpppp.o.ppppm 
+  aiip...piia  
+     w...w     
+      w.w      
+      w w      
+               

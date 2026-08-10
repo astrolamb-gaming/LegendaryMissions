@@ -126,8 +126,13 @@ GameCode:
     # marker_obj.data_set.set("radar_color_override", "purple" ,0)
     
 
-    await task_schedule(spawn_friendly_npc)
+    # spawn_players FIRST, ahead of everything else this map builds. The map body runs
+    # inline in the frame that handled the Start button, and this label is the last
+    # thing that has to finish before the consoles can leave the selection screen - so
+    # whatever sits ahead of it is charged straight to the crew's wait. The friendly
+    # NPCs need the stations, not the players, so they cost nothing by moving behind it.
     await task_schedule(spawn_players)
+    await task_schedule(spawn_friendly_npc)
     await task_schedule(default_player_friendly_eyes)
     await task_schedule(docking_standard_player_station)
 
@@ -136,7 +141,12 @@ GameCode:
     # and is unaffected by friendly / player / monster / lethal choices.
     neb_chance = terrain_value * 0.0010
     ast_chance = terrain_value * 0.0008
+    # Sowed: the field is created over 6 seconds instead of in one frame. The keyed
+    # spawner already re-seeds per cell and restores the RNG, so deferring it does
+    # not shift the stream at all - this field is identical sowed or not.
+    terrain_sow_begin(over=6)
     terrain_spawn_field_keyed(map_key, 1000, -inner, -inner, inner, inner, terrain_value, neb_chance, ast_chance, exclude=stations, exclude_radius=15_000)
+    terrain_sow_end()
 
     # Keyed candidate pool for pickups / monsters / black holes (clear of
     # stations). They sample the pool, so they need not match across sizes.
@@ -269,6 +279,16 @@ GameCode:
     # the quest system (and shows on the results log), not a bespoke poll.
     # (task_end_game is left for the other maps that still use it.)
     quest_grant_amd(SHARED, document_get_amd_file(get_mission_dir_filename("maps/siege_quests.amd"), data_parser=amd_quest_data))
+    # Say what the clock MEANS this game, instead of naming the option that decides it.
+    # The authored line read "...(when Survive Clock is set to Loss)" - a server setting
+    # most players, and every convention player, will never see. Worse, on "Win" the
+    # clock quest can never fail (siege_watch fires siege_won on timeout), so telling
+    # the crew to beat a clock was actively misleading. Resolve it once, here, where the
+    # option is known.
+    if SIEGE_TIMEOUT == "Loss":
+        quest_set_key(SHARED, "beat_clock", "description", "Break the siege before the clock runs out. If time expires, the siege is lost.")
+    else:
+        quest_set_key(SHARED, "beat_clock", "description", "Hold the line. If the clock runs out with the siege unbroken, you have still held - and the siege ends in your favor.")
     task_schedule(siege_watch)
     task_schedule(siege_bonus_objectives)
     # A "continuous" boss (Trigger: continuous) keeps respawning waves from the start
@@ -403,4 +423,5 @@ brain:
 # Per-boss logic/comms lives in bosses/<key>.mast (co-located with bosses/<key>.amd),
 # imported by maps/__init__.mast: Ragnarok's Xorn defection -> bosses/ragnarok.mast;
 # the Continuous wave loop (siege_continuous) -> bosses/continuous.mast.
+
 

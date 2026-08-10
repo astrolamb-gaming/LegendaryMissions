@@ -68,6 +68,22 @@ gui_reroute_clients("client_main")
     shared mission_list = maps_get_list()
     shared mission_overview = maps_get_init()
     shared WORLD_SELECT_path  = SETTINGS.get("WORLD_SELECT")
+
+    # A map named on the ENGINE COMMAND LINE wins, and starts without the picker:
+    #     Artemis3-x64-release.exe autostartserver defaultmission=LM_TestRange map=sandbox
+    # `map=` is not an engine flag - engine 1.3.5 passes unrecognized key=value arguments
+    # straight through to command_line_dict(), which is what makes this possible at all.
+    # This is the engine-side twin of cosmos_dev's --map, so an automated run and a headless
+    # one select a map the same way. maps_find accepts an index, a path, a display name or
+    # an unambiguous substring, and returns None rather than guessing between two matches.
+    cli_map = command_line_get("map")
+    if cli_map is not None:
+        cli_selected = maps_find(cli_map)
+        if cli_selected is None:
+            log(f"command line map '{cli_map}' matched no map - showing the picker", "server_console", "warning")
+        else:
+            WORLD_SELECT_path = cli_selected.path
+            AUTO_START = True
     sim_create()
     #
     # Yield a frame before create_sides. sim_create() replaces the simulation, but
@@ -193,7 +209,14 @@ gui_reroute_clients("client_main")
         presets = game_code_presets_for_map(WORLD_SELECT.path)
         preset_labels = [p["name"] for p in presets]
         gui_row("row-height: 30px;")
-        preset_dd = gui_drop_down(f"text: Presets ({len(presets)}); list: {','.join(preset_labels)}", var="GAME_CODE_PRESET")
+        # Show the SELECTED preset, like every other dropdown in the mission
+        # ($text: {VAR}). This was the literal string "Presets (N)", so whenever
+        # GAME_CODE_PRESET did not resolve to a list entry the widget fell back to that
+        # label - and players read it as an option that was not in the list ("Presets (3)"
+        # with three named presets). Interpolated inline rather than via an intermediate
+        # variable: a bare MAST string assignment is re-run through f-string formatting,
+        # and a preset name is user-typed text that may contain a brace.
+        preset_dd = gui_drop_down(f"$text: {GAME_CODE_PRESET or 'Presets'}; list: {','.join(preset_labels)}", var="GAME_CODE_PRESET")
         on gui_message(preset_dd):
             for p in presets:
                 if p["name"] == preset_dd.value:
@@ -256,6 +279,20 @@ Main:
 
 
 ===== start ======
+    # AUTO_START (headless / dev launch) can reach here BEFORE the story's top-level
+    # `main` has finished: @map labels register at COMPILE time, so the console is ready
+    # to launch while the `default shared` assignments in main have not run. Launching
+    # then emits game_started against a story with no shared state, so any route whose
+    # `if` reads one raises - autoplay's
+    # `//signal/game_started if SETTINGS.get("AUTO_PLAY", ...)` died with
+    # `name 'SETTINGS' is not defined`. A human never hits it: they click Start long
+    # after main. So settle only on the automated path, and only here on the launch -
+    # NOT in show_server_menu, where waiting stalls the server GUI task itself.
+    #
+    # delay_app (wall clock), not delay_sim: the start screen's sim is PAUSED, so a sim
+    # delay never fires - the same reason game_code_reload above uses delay_app.
+    if AUTO_START:
+        await delay_app(1)
     # sim_create()
     sim_resume()
     #
@@ -277,7 +314,27 @@ Main:
         # ever presenting the panel, so this guarantees the map body's vars exist (set-if-absent,
         # so anything the operator changed on the panel is preserved).
         map_apply_defaults(WORLD_SELECT)
-        task_schedule(WORLD_SELECT)
+        #
+        # ROSTER BEFORE WORLD. //shared/signal/reconcile_player_roster (fleets/map_common.mast)
+        # culls the roster to PLAYER_COUNT and applies any game-code loadout. It needs nothing
+        # the map builds, and a //shared/signal route with no await runs synchronously inside
+        # signal_emit - the same property the create_sides emit above relies on - so the roster
+        # is final by the time this line returns. Must be AFTER map_apply_defaults, which is
+        # what settles PLAYER_COUNT.
+        #
+        # This is what makes the deferred schedule below safe.
+        signal_emit("reconcile_player_roster")
+        #
+        # DEFERRED on purpose, and this is the point of the whole exercise. The map body is the
+        # mission's entire opening burst - stations, minefields, NPCs, terrain, fleets - and
+        # scheduled inline it all ran inside the frame that handled this button, before a single
+        # console repainted. Nothing down there is a precondition for showing a console: a
+        # console needs a valid player ship, and it has had one since the server console opened.
+        # So the map gets the next frame and the crew gets this one.
+        #
+        # The visible cost is that players are still in their staging formation for a frame or
+        # two before the map moves them to a starbase.
+        task_schedule(WORLD_SELECT, defer=True)
 
     #
     # Consoles are waiting to be started 
@@ -320,8 +377,13 @@ Main:
     # and avoid seeing some stuff be created 
     # at 0,0,0
     await delay_sim(0)
-    # Find a valid ship
-    ship_id = sbs.get_ship_of_client(client_id)
+    # Find a valid ship. NOT sbs.get_ship_of_client: while science has this screen
+    # showing something ("on screen"), the console is ASSIGNED to the subject - the
+    # engine only honors a camera change when the console and the lens ride the same
+    # object - so get_ship_of_client would answer with the ENEMY here, and this label
+    # would then read the enemy's main-screen state and link it as a console owner.
+    # viewscreen_home_ship answers with our own ship either way. VIEWSCREEN_PLAN.md
+    ship_id = viewscreen_home_ship(client_id)
 
     gui_console("mainscreen")
     set_inventory_value(client_id, "CONSOLE_TYPE", "mainscreen")
@@ -411,6 +473,21 @@ Main:
 
     sbs.set_main_view_modes(client_id, view, facing, mode)
 
+    # A 2D shot reflows the radar to leave the data column's gutter free. Only the 2D
+    # view can do this - the engine draws 3dview full-bleed, so there the column is an
+    # overlay on top of it. Same rect either way, so the crew's eye does not move when
+    # the mode changes.
+    if viewscreen_mode(ship_id) == "tactical":
+        gui_section(style="area:0,0,71,100;")
+        gui_row()
+        gui_layout_widget("2dview")
+
+    # Science changed what is on screen: repaint, because the widget list itself differs
+    # between a 3D shot and a 2D one. Scoped to THIS ship - one bridge's viewer must not
+    # repaint another's.
+    on signal viewscreen:
+        jump show_main_game_screen if VIEWSCREEN_SHIP == ship_id
+
     await gui()
 
 
@@ -464,11 +541,38 @@ Main:
 # present are returned untouched, so faces/respawn_time are re-applied but nothing moves.
 #
 === create_default_player_ships
+    # A new roster is by definition not reconciled yet. This clears the latch on
+    # //shared/signal/reconcile_player_roster (fleets/map_common.mast), so a roster
+    # rebuilt after a sim wipe gets culled again without needing a special case.
+    shared players_cleaned = False
     if PLAYER_CREATE_DEFAULT:
         # (side creation is done synchronously before this via create_sides, so the
         # player_spawn side lookups resolve.)
-        for slot, player_ship_data in enumerate(SETTINGS.get("PLAYER_LIST")):
-            player_ship = player_ensure(slot, 0,0,0, player_ship_data["ship"], player_ship_data["name"], player_ship_data["side"])
+        #
+        # Line abreast, NOT a pile on the origin. The whole roster exists from the moment
+        # the server console opens, because the crew picks among them - but only the first
+        # PLAYER_COUNT survive spawn_players. So for the entire selection screen, and for
+        # the first frames after Start, the unused hulls are real visible objects. Spawned
+        # at 0,0,0 they were a stack of identical ships sitting exactly where the camera
+        # starts, which is what made them conspicuous both while they sat there and at the
+        # moment they winked out. Spread on a row they read as a staging formation, and one
+        # of them disappearing is unremarkable.
+        #
+        # This is the fix for that; it is not a delay. Consoles used to wait out the purge
+        # behind a `players_cleaned` poll (game_started_console) purely so nobody watched
+        # it happen. Make the thing not worth hiding and the wait is not needed.
+        #
+        # Centred on the origin, so the group's centre of mass is where it has always been
+        # and a mission that never repositions its players is unaffected. The half-step
+        # that centring produces, plus the Z offset, means no slot ever lands exactly on
+        # 0,0,0 for any roster size, odd or even. Maps move these near a friendly station
+        # in spawn_players, so the formation only has to hold up until then.
+        _roster = SETTINGS.get("PLAYER_LIST")
+        _slot_gap = 2000
+        _slot_mid = (len(_roster)-1)/2.0
+        for slot, player_ship_data in enumerate(_roster):
+            _slot_x = (slot - _slot_mid) * _slot_gap
+            player_ship = player_ensure(slot, _slot_x, 0, 2000, player_ship_data["ship"], player_ship_data["name"], player_ship_data["side"])
             player_ship_data["id"] = player_ship
             add_role(player_ship, "default_player_ship")
             set_face(player_ship, random_face(player_ship_data["face"]))

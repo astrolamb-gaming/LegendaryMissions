@@ -17,7 +17,12 @@
 # impulse by default (grav_tether_set_overspeed_default to change to snap/off).
 
 //popup/weapons if has_any_role(WEAPONS_ORIGIN_ID, "__player__")
-    gt_has = grav_tether_get(WEAPONS_ORIGIN_ID, WEAPONS_SELECTED_ID) is not None
+    # grav_tether_HAS (the registry), not grav_tether_get (the live engine connection).
+    # A Tow is a rope-TOGGLE: it deletes the connection whenever the load is inside the
+    # rope length and re-adds it when the load drifts out - so `get` reads None for most
+    # of a perfectly normal tow. Gated on that, this menu offered "Grav Tow" to something
+    # already under tow and never offered "Release", so a crew could not let go.
+    gt_has = grav_tether_has(WEAPONS_ORIGIN_ID, WEAPONS_SELECTED_ID)
     if gt_has:
         + "Release":
             grav_tether_release(WEAPONS_ORIGIN_ID, WEAPONS_SELECTED_ID)
@@ -30,3 +35,96 @@
     if not gt_has and not has_any_role(WEAPONS_SELECTED_ID, "item,upgrade,station,asteroid,__npc__"):
         + "Grav Lock":
             grav_tether_lock(WEAPONS_ORIGIN_ID, WEAPONS_SELECTED_ID)
+
+
+# ---------------------------------------------------------------------------------------
+# FIGHTER: the nose is the cursor.
+#
+# A pilot gets one button (the cockpit console owns it; see hangar/hangar.mast). It
+# nose-aims, and when the target says what to do it just does it - a rock is an anchor, a
+# pod is a pickup, and making a pilot confirm that is a menu for the sake of a menu. When
+# the target is genuinely a CHOICE the button synthesizes this popup on it instead.
+#
+# Path B: the event is fabricated, not clicked, so this consumes NO select channel -
+# comms, weapons and science selects all stay free. Capital ships reach the same actions
+# through //popup/weapons above; this is the same verbs, a different way in.
+
+//popup/tether if has_any_role(TETHER_ORIGIN_ID, "__player__,cockpit")
+    lmtf_towed = grav_tether_involves(TETHER_ORIGIN_ID)
+    << "Grav-tether: {lm_tether_target_name(TETHER_SELECTED_ID)}"
+
+    if lmtf_towed:
+        + "Release":
+            grav_tether_release_any(TETHER_ORIGIN_ID)
+            lm_tether_cycle_reset(TETHER_ORIGIN_ID)
+
+    if not lmtf_towed:
+        + "Tow":
+            lm_tether_apply(TETHER_ORIGIN_ID, TETHER_SELECTED_ID, "tow")
+        + "Lock":
+            lm_tether_apply(TETHER_ORIGIN_ID, TETHER_SELECTED_ID, "lock")
+        + "Swing":
+            lm_tether_apply(TETHER_ORIGIN_ID, TETHER_SELECTED_ID, "swing")
+        # Target correction from INSIDE the popup - still no select channel. Walks
+        # outward through the cone and wraps, so it can never dead-end.
+        + "Cycle target":
+            lmtf_next = lm_tether_cycle_next(TETHER_ORIGIN_ID)
+            if lmtf_next is not None:
+                lm_tether_open_popup(TETHER_ORIGIN_ID, lmtf_next.id)
+
+
+# The beam breaks under hard fire, so towing under attack is a real risk rather than a
+# free ride. //damage/object fires per hit and carries the amount in EVENT.sub_float;
+# only a heavy hit shakes a tether loose, or every skirmish would drop every load.
+//damage/object if grav_tether_involves(DAMAGE_TARGET_ID) or grav_tether_involves(DAMAGE_ORIGIN_ID)
+    default sub_float = 0
+    lmgt_hit = EVENT.sub_float or 0
+    ->END if lmgt_hit < LM_TETHER_BREAK_DAMAGE
+    if grav_tether_involves(DAMAGE_TARGET_ID):
+        grav_tether_release_any(DAMAGE_TARGET_ID)
+        comms_broadcast(DAMAGE_TARGET_ID, "Grav-tether shaken loose by the hit.")
+
+
+# Ran the reserves dry mid-haul. The library drops the load rather than pinning the ship
+# at zero energy - being slow is a mechanic, being stranded is not.
+//shared/signal/grav_tether_dry
+    default SOURCE_ID = 0
+    ->END if SOURCE_ID == 0
+    comms_broadcast(SOURCE_ID, "Grav-tether offline - not enough power to hold the load.")
+
+
+# Too fast to get hold of. Says WHY, or the button just looks broken.
+//shared/signal/grav_tether_too_fast
+    default SOURCE_ID = 0
+    ->END if SOURCE_ID == 0
+    comms_broadcast(SOURCE_ID, "Target is under power - cripple its engines before you can get a lock.")
+
+
+# A hulk cashed in at a friendly station. The tick does the work; this is the telling.
+//shared/signal/lm_tether_salvage_delivered
+    default SHIP_ID = 0
+    default UNITS = 0
+    ->END if SHIP_ID == 0
+    comms_broadcast(SHIP_ID, f"Hulk delivered - {UNITS} units of salvage aboard.")
+
+
+# --- phase 5 -------------------------------------------------------------------------
+# A black hole is the anchor the swing was invented for. Offered only when one is
+# actually in reach, and the rope is clamped clear of the gravity well by
+# lm_tether_swing_hole - the tether must never be the thing that drops someone in.
+//popup/tether if has_any_role(TETHER_ORIGIN_ID, "__player__,cockpit") and lm_tether_nearest_hole(TETHER_ORIGIN_ID) is not None
+    + "Slingshot the black hole":
+        lm_tether_swing_hole(TETHER_ORIGIN_ID, lm_tether_nearest_hole(TETHER_ORIGIN_ID))
+
+
+# Pinned by a hostile beam. Says what to do about it, because a ship that is suddenly
+# not going anywhere with no explanation reads as a bug.
+//shared/signal/lm_tether_pinned
+    default SHIP_ID = 0
+    ->END if SHIP_ID == 0
+    comms_broadcast(SHIP_ID, "Caught in a hostile grav-tether - burn hard away to tear loose.")
+
+//shared/signal/lm_tether_broke_free
+    default SHIP_ID = 0
+    ->END if SHIP_ID == 0
+    comms_broadcast(SHIP_ID, "Tether snapped - you are free.")

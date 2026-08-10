@@ -20,8 +20,6 @@
         "side_missions",
         "upgrades",
         "quests",
-        "admiral",
-        "admiral_comms",
         "gamemaster",
         "gamemaster_comms",
         "prefabs",
@@ -31,11 +29,13 @@
         "collisions",
         "fabrication",
         "grav_tether",
+        "turrets",
         "data_panels",
         "documents",
         "lm_lore",
         "director",
-        "avatar_editor"
+        "avatar_editor",
+        "races"
     ],
     "zip": [
         "media"
