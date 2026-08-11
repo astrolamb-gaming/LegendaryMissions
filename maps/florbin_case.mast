@@ -66,6 +66,12 @@ shared FB_TEXT = {}
     # at load time. (Docking times now ride on each FbCargo as cargo.dep_time.)
     FB_TEXT = amd_text_map(amd_section(PR_DOC, "florbin_text"))
 
+    # The conversations the script starts (## Voices). Registering them is what lets a
+    # beat name one - `Action: ds1 hails ds1_brief` has a key and nothing else - and the
+    # `{suspects}` slot is the one word in the briefing the mission builds at runtime.
+    dialogue_register_scenes(amd_section(PR_DOC, "pr_voices"))
+    dialogue_register_slot("suspects", fb_suspects_text)
+
     # ---- The suspect trail is generated as pure DATA by fb_generate_case (mission_helper_functions.py),
     # replacing ~400 lines of per-scenario / per-ship brute force. Pick the ambassador container
     # (clue0) + its paired clue (clue1) from clue_list[0:20] - a REAL container, guaranteed - then two
@@ -136,36 +142,22 @@ shared FB_TEXT = {}
     task_schedule(fb_kidnap_message)
     task_schedule(task_peacetime_end_game)
 
+
     #-----------------------------------------------------------------------------------------------------------------------------
     # Comms Section - Adds comms buttons for talking to stations. Some buttons only work if the player is docked with the station.
 
-//comms if has_roles(COMMS_SELECTED_ID, "tsn, station, ds1") and FB_STATUS >= 1 
-    + "Investigate Kidnapping" //comms/fb_investigate_kidnapping 
+//comms if has_roles(COMMS_SELECTED_ID, "tsn, station, ds1") and FB_STATUS >= 1 and fb_is_briefed(COMMS_ORIGIN_ID)
+    + "Cargo Manifests" //comms/fb_investigate_kidnapping
 
 //comms/fb_investigate_kidnapping
     investigate_msg = get_inventory_value(COMMS_SELECTED_ID, "investigate_message")
     ship1_cargo1 = get_inventory_value(COMMS_SELECTED_ID, "ship1_cargo1")
     ship2_cargo1 = get_inventory_value(COMMS_SELECTED_ID, "ship2_cargo1")
     ship3_cargo1 = get_inventory_value(COMMS_SELECTED_ID, "ship3_cargo1")
-    # Prose is the `briefing` template (## Florbin Text); {suspects} fills from the task var.
-    suspects = investigate_msg
-    # Send the briefing ONCE per ship. A comms route body re-runs every time the menu is
-    # rebuilt - and pressing one of the manifest buttons below rebuilds it - so an
-    # unguarded comms_receive here re-sent "Ambassador Kidnapped" on every manifest
-    # press. That is issue #687: the duplicate is the BRIEFING, triggered by an
-    # unrelated button. Only menu construction belongs in a route body; a one-time
-    # narrative beat needs a guard.
-    fb_briefed = get_inventory_value(COMMS_ORIGIN_ID, "fb_briefed", 0)
-    if fb_briefed == 0:
-        set_inventory_value(COMMS_ORIGIN_ID, "fb_briefed", 1)
-        comms_receive(FB_TEXT.get("briefing"), title="Ambassador Kidnapped", title_color="orange")
-        # THIS is "Take the Case" - the crew hailing DS 1 and being briefed, which is what
-        # the step's text promises. It used to be bridged off FB_STATUS >= 1, but that is
-        # set during map setup (fb_investigation's first line), so the step completed
-        # itself about a second into the shift. The quest is shared, so whoever hails
-        # first opens it for everyone; quest_mark_complete is idempotent, so a second
-        # ship hailing later is harmless.
-        signal_emit("quest_signal", {"SIGNAL_NAME": "case_opened"})
+    # The briefing itself is no longer sent here - DS 1 HAILS the crew with it during
+    # setup above. This menu is now only the cargo manifests, and it is
+    # reachable only after that hail has been answered, so the case still opens in
+    # one place and cannot open twice.
     + !0 "Back" //comms
     + "Cargo Manifest {ship1_cargo1.ship}" fb_cargo_manifest {"ckey":"ship1_cargo1"}
     + "Cargo Manifest {ship2_cargo1.ship}" fb_cargo_manifest {"ckey":"ship2_cargo1"}
@@ -323,6 +315,14 @@ shared FB_TEXT = {}
     ->END if len(ds1_list) < 1
     ds1_id = ds1_list[0]
     send_general_message(fb_admiral.name, FB_TEXT.get("admiral_kidnap"), get_face(fb_admiral.id), ds1_id)
+
+    # THEN DS 1 calls. Revealing the step is the whole of it: `florbin/brief` declares
+    # `Action: ds1 hails ds1_brief`, so the call, its title, its portrait, its words and
+    # what answering MEANS all live in peacetime_remastered.amd. Revealed HERE and not at
+    # grant because the Admiral's message is what tells the crew why anyone is calling,
+    # and `Action:` fires the moment a beat goes active.
+    await delay_sim(3)
+    quest_reveal(SHARED, "florbin/brief")
     ->END
 
 ===== fb_scanning_cargo_containers ======

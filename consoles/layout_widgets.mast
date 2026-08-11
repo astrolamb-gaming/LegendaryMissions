@@ -30,6 +30,10 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         # shows in Log, which is everything - so a subset tab can never hide a message.
         gui_info_panel_add("ship", 66, gui_panel_log_ship, None, gui_panel_log_tick)
         gui_info_panel_add("mission", 85, gui_panel_log_mission, None, gui_panel_log_tick)
+        # Every incoming hail this ship has had, re-readable. Selecting one replays
+        # it - strictly READ-ONLY: a replay cannot change or undo a choice already
+        # made, which hail_answer enforces rather than the layout.
+        gui_info_panel_add("hails", hail_panel_icon(), hail_panel_history, None)
 
         # The space the text waterfall used to occupy, directly under ship data on every
         # console so the crew always looks in ONE place for the latest line. The waterfall
@@ -44,21 +48,24 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
 
         gui_row()
         gui_blank()
-        
-        gui_row("row-height: 45px;margin:0,0,0,10px;")
 
-        follow_tag = get_inventory_value(client_id, "2d_follow", True)
-        # Set back in case of default
-        set_inventory_value(client_id, "2d_follow", follow_tag)
-        gui_checkbox("Follow","col-width:90px;", var="follow_tag")
-        on change follow_tag:
-            ship = sbs.get_ship_of_client(client_id)
-            _sel = get_comms_selection(ship)
-            set_inventory_value(client_id, "2d_follow", follow_tag)
-            comms_set_2dview_focus(client_id, _sel)
+        # NOT sbs.get_ship_of_client: while an orbit hail runs, this console is
+        # ASSIGNED to the hailer, so the engine would answer with the raider.
+        _hail_ship = viewscreen_home_ship(client_id)
 
-        gui_row("row-height: 40px;")
-        gui_layout_widget("red_alert")
+        # Where an incoming hail shows for THIS console: Off / This Console /
+        # Main Screen / Both. Above the list, because it is a standing setting and the
+        # list underneath it is what changes.
+        gui_row("row-height: 40px;margin:0,0,0,10px;")
+        hail_where_dropdown(client_id, "col-width:150px;")
+        # Ticked means SOUND. It is the ship's setting, not this console's, because the
+        # audio plays once for the whole bridge.
+        hail_audio_checkbox(client_id, "col-width:90px;")
+
+        # "Incoming Hails" - the waiting hails, or the open conversation's replies. One
+        # call, and the library owns which of its three states applies. A listbox, so a
+        # queue longer than the space still scrolls rather than being dropped.
+        hail_choice_strip(_hail_ship, client_id)
 
 
 
@@ -73,7 +80,14 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         gui_row("row-height:45px;")
         gui_layout_widget("radar_zoom_ctrl")
         gui_row()
-        gui_layout_widget("comms_2d_view")
+        # A hail placed on THIS console takes the radar's space. gui_widget_offscreen
+        # is the only reliable way to be rid of an engine widget - gui_hide does not
+        # work on them.
+        if hail_shows_here(client_id):
+            gui_widget_offscreen("comms_2d_view", client_id)
+            hail_view(_hail_ship, client_id)
+        else:
+            gui_layout_widget("comms_2d_view")
         
     # Right
     ss = gui_screen_size(client_id)
@@ -107,6 +121,25 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         gui_blank()
         gui_row() #"padding:0,25px,10px,0")
         gui_layout_widget("comms_sorted_list")
+
+        # Follow and RED ALERT ride here, under the contact list, rather than in the
+        # left column: that column already carries a 400px info panel and a log tail,
+        # and the incoming-hail answer strip needs the room. One row, one height, so
+        # they read as a single control bar.
+        gui_row("row-height: 40px;")
+        follow_tag = get_inventory_value(client_id, "2d_follow", True)
+        # Set back in case of default
+        set_inventory_value(client_id, "2d_follow", follow_tag)
+        gui_layout_widget("red_alert")
+        gui_checkbox("Follow", var="follow_tag")
+        
+        on change follow_tag:
+            ship = viewscreen_home_ship(client_id)
+            _sel = get_comms_selection(ship)
+            set_inventory_value(client_id, "2d_follow", follow_tag)
+            comms_set_2dview_focus(client_id, _sel)
+        
+        
     
 
 
@@ -183,7 +216,7 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         gui_layout_widget("science_sorted_list")
 
     on change follow_tag:
-        ship = sbs.get_ship_of_client(client_id)
+        ship = viewscreen_home_ship(client_id)
         _sel = get_science_selection(ship)
         set_inventory_value(client_id, "2d_follow", follow_tag)
         science_set_2dview_focus(client_id, _sel)
@@ -365,7 +398,7 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         set_inventory_value(client_id, "2d_follow", follow_tag)
         gui_checkbox("Follow","col-width:90px;", var="follow_tag")
         on change follow_tag:
-            ship = sbs.get_ship_of_client(client_id)
+            ship = viewscreen_home_ship(client_id)
             _sel = get_comms_selection(ship)
             set_inventory_value(client_id, "2d_follow", follow_tag)
             comms_set_2dview_focus(client_id, _sel)
@@ -389,8 +422,8 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
             # prototype is where that pattern was copied FROM, and it cost real time
             # twice; gui_hide now warns when handed an engine widget. Simply not asking
             # for it is what keeps it off.
-            recent_listbox = gui_list_box(recent_list,"row-height: 0.1em; background:#1572;", item_template=comms_recent_item, select=True)
-            history_listbox = gui_list_box(message_list,"row-height: 0.1em; background:#1572;", item_template=comms_message_item, select=True)
+            recent_listbox = gui_list_box(recent_list,"item-gap: 0.1em; background:#1572;", item_template=comms_recent_item, select=True)
+            history_listbox = gui_list_box(message_list,"item-gap: 0.1em; background:#1572;", item_template=comms_message_item, select=True)
             ### Need library help to make better click area
             history_text = gui_text_area("", "click_text:"";click_background:#0000:")
             gui_hide(history_text)

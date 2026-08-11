@@ -545,3 +545,40 @@ def pr_salvage_award(ship, units):
     from sbs_utils.procedural.query import to_id
     sid = to_id(ship)
     set_inventory_value(sid, "salvage", get_inventory_value(sid, "salvage", 0) + int(units))
+
+
+def fb_suspects_text(agent_id=None, speaker=None):
+    """The manifest DS 1 read off the last three haulers - the `{suspects}` slot.
+
+    Registered with `dialogue_register_slot`, so the briefing stays one authored
+    paragraph in peacetime_remastered.amd with one runtime word in it, rather than a
+    paragraph assembled in Python because a hail had nowhere to interpolate.
+
+    Read back off the station rather than carried from setup, because that is where
+    `fb_investigation` already stored it.
+    """
+    from sbs_utils.procedural.inventory import get_inventory_value
+    from sbs_utils.procedural.roles import role
+    from sbs_utils.procedural.query import to_id_list
+    for ds1_id in to_id_list(role("ds1")):
+        message = get_inventory_value(ds1_id, "investigate_message", None)
+        if message:
+            return str(message)
+    return ""
+
+
+def fb_is_briefed(ship):
+    """Whether the crew has answered DS 1's briefing hail.
+
+    The gate on the cargo-manifest menu. Answered by the shared QUEST rather than by a
+    per-ship flag, so ONE bridge answering opens the manifests for every bridge.
+
+    That is a decision about THIS case, not a rule to copy. The Florbin investigation
+    is a single case the whole game shares, and a bridge locked out of a case its own
+    quest log says is underway reads as a bug. A mission where answering the call is
+    meant to be each crew's OWN act should keep a per-ship flag - `Scope: shared` on
+    the quest does not settle it, and both readings are legitimate.
+    """
+    from sbs_utils.agent import Agent
+    from sbs_utils.procedural.quest import quest_get_state, QuestState
+    return quest_get_state(Agent.SHARED_ID, "florbin/brief") == QuestState.COMPLETE

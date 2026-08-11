@@ -180,7 +180,7 @@ gui_reroute_clients("client_main")
             MISSIONS_TITLE = "Select a mission. {l} types."
         else:
             MISSIONS_TITLE = "Mission"
-        mission_picker = gui_list_box(mission_list,"row-height: 7em; background:#1578;", item_template=main_mission_select_template, title_template=MISSIONS_TITLE, select=True, carousel=True)
+        mission_picker = gui_list_box(mission_list,"item-gap: 7em; background:#1578;", item_template=main_mission_select_template, title_template=MISSIONS_TITLE, select=True, carousel=True)
         # Initialize the selection to account for if we already have one
         mission_picker.set_selected_index(mission_index)
 
@@ -482,11 +482,24 @@ Main:
         gui_row()
         gui_layout_widget("2dview")
 
+    # An incoming hail put on the main screen builds NOTHING here. Both forms are
+    # overlays now - a full-screen one for a portrait or a still, a smaller band for an
+    # orbit shot - so this console does not move a single engine widget. It used to push
+    # the views offscreen, and gui_widget_offscreen parks a widget at 100,100 with
+    # nothing to put it back: the 3D view never returned, and ship_data, which was never
+    # moved, sat on top of the conversation.
+
     # Science changed what is on screen: repaint, because the widget list itself differs
     # between a 3D shot and a 2D one. Scoped to THIS ship - one bridge's viewer must not
     # repaint another's.
     on signal viewscreen:
         jump show_main_game_screen if VIEWSCREEN_SHIP == ship_id
+
+    # A hail arriving, advancing or ending changes this screen the same way, and the
+    # widget list differs too, so it is a full repaint rather than a value update.
+    # Polled for the same reason the comms console polls it - see standard_consoles.mast.
+    on change hail_console_revision(client_id):
+        jump show_main_game_screen
 
     await gui()
 
