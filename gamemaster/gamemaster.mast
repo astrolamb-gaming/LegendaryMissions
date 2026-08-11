@@ -262,8 +262,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
             gamemaster_show_nav_area(cambot, pos, delta, "Game Master", "lmb", "#040")
 
 --- gm_finalize_gui
-    # if True:
-    #     await task_schedule(gm_test_restart_button)
+    # Can add temp code here for testing purposes
     await gui()
 
 
@@ -932,28 +931,32 @@ priority: 20 # Smaller number is higher priority
 === gm_menu_spawn_ships
 metadata: ```
 type: gm_menu/spawn/ships
-icon_index: 0
+icon_index: 140
 ```
-    gui_row("row-height: 2em;")
-    filt = gui_input("$text:filter;")
+    gui_row("row-height: 1.5em;")
+    filt = gui_input("$text:light;")
     gui_row()
 
     ship_list = filter_ship_data_generically(filt.value)
+    print(f"Ship list length: {len(ship_list)}")
 
     list_box = gui_list_box(ship_list, "", item_template=gm_ship_spawn_select_template, select=True)
 
     on change filt.value:
+        print("New value: {filt.value}")
         ship_list = filter_ship_data_generically(filt.value)
         list_box.items = ship_list
 
     # This row shows additional details for the selected ship
     gui_row()
     gui_text(f"Details here....")
-    gui_row("row-height: 1em;")
+
+    # Spawn row
+    gui_row("row-height: 1.5em;")
     spawn_button = gui_button("Spawn")
     on gui_message(spawn_button):
         sel = list_box.get_selected()
-        print("Spawning: {sel.art_id}")
+        print(f"Spawning: {sel.get('art_id')}")
 
 
     yield success
@@ -966,11 +969,29 @@ icon_index: 118
 icon_color: "#00ffd5"
 priority: 10 # Smaller number is higher priority
 ```
-    debug_print("Terrain")
-    gui_button("Testing terrain")
+    gui_row("row-height: 1.6em;")
+    gui_text("$text:Selected Object Details;font:gui-2;justify:left;")
     gui_row()
-    gui_blank()
+    selected_details = gui_text_area("Select an object in science or weapons to view details.")
+
+    gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
+    task_schedule(gm_udpate_selected_ship_screen, data={"gm": gm, "selected_details": selected_details})
     yield success
+
+=== gm_udpate_selected_ship_screen
+" Update the ship screen with the last selected object's infomration. 
+metadata: ``` yaml
+gm:
+selected_details:
+```
+    yield fail if gm is None
+
+    if selected_details is not None:
+        details_text = gm_selected_object_details(gm)
+        selected_details.update(details_text)
+
+    await delay_sim(1)
+    jump gm_udpate_selected_ship_screen
 
 
 === gm_old_comms_menu
@@ -993,16 +1014,88 @@ priority: 97
     gui_layout_widget("comms_sorted_list")
     yield success
 
+=== gm_science
+metadata: ```
+type: gm_menu/science
+icon_index: 88
+priority: 96
+```
+    gui_row()
+    gui_text("TODO - science stuff here")
+
+=== gm_old_science
+metadata: ```
+type: gm_menu/science/old_science_selection
+icon_index: 0
+priority: 500
+```
+    gui_row()
+    gui_layout_widget("science_data")
+    gui_row()
+    gui_layout_widget("science_data_tabs")
+    gui_row()
+    gui_layout_widget("science_data_freq")
+    gui_row()
+    gui_layout_widget("science_sorted_list")
+    yield success
+
 === gm_settings
 metadata: ```
 type: gm_menu/settings
 icon_index: 0
 priority: 99
 ```
-    gui_row("row-height: 2em;")
-    timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
-    test_gui_text_escape = gui_text_escape("{timer}")
-    gui_text(f"$text:{test_gui_text_escape}")
+    gui_row()
+    sec = gui_sub_section()
+    t = None
+    remaining = None
+    with sec:
+        gui_row("row-height: 2em; background: #1234566b;")
+        timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
+        test_gui_text_escape = gui_text_escape("{format_time(timer)}")
+        gui_text("$text:Mission Elapsed Time:; justify: left;")
+        t = gui_text(f"$text:{test_gui_text_escape};justify: right;")
+        if is_timer_set(SHARED, "time_limit"):
+            time = format_time_remaining(SHARED, "time_limit")
+            gui_row("row-height: 2em; background: #1234566b;")
+            gui_text("$text: Time Remaining:; justify: left;")
+            remaining = gui_text(f"$text:{time};justify: right;")
+            gui_row("row-height: 2em;")
+            m1 = gui_button(f"$text:-1 min", data={"minutes":-1})
+            p1 = gui_button(f"$text:+1 min", data={"minutes":1})
+            gui_row("row-height: 2em;")
+            m5 = gui_button(f"$text:-5 min", data={"minutes":-5})
+            p5 = gui_button(f"$text:+5 min", data={"minutes":5})
+
+            gui_message(m1, gm_add_remaining_time)
+            gui_message(p1, gm_add_remaining_time)
+            gui_message(m5, gm_add_remaining_time)
+            gui_message(p5, gm_add_remaining_time)
+        task_schedule(gm_elapsed_time_update, data={"t": t, "sec": sec, "remaining":remaining})
+    yield success
+
+=== gm_add_remaining_time
+" Executes the gm add/remove remaining time functionality.
+    if __ITEM__ is None:
+        ->END
+    minutes = __ITEM__.data.get("minutes",0)
+    seconds = __ITEM__.data.get("seconds",0)
+    timer_add_time(SHARED, "time_limit", seconds, minutes)
+    ->END
+
+=== gm_elapsed_time_update
+" Updates the elapsed time on the gamemaster's screen. 
+    if t is None or sec is None:
+        print("Timer text not specified")
+        ->END
+    v = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
+    t.update(f"$text:{format_time(v)};justify:right;")
+    if remaining is not None:
+        v = format_time_remaining(SHARED, "time_limit")
+        remaining.update(f"$text:{v};justify: right;")
+    gui_represent(sec)
+    await delay_sim(1)
+    jump gm_elapsed_time_update
 
 #endregion
 
