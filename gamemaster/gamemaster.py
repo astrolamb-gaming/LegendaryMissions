@@ -1,10 +1,11 @@
+from sbs_utils.procedural.gui.message import gui_message
 from sbs_utils.procedural.gui.section import gui_sub_section
 from sbs_utils.procedural.gui.ship import gui_ship
 from sbs_utils.procedural.ship_data import get_ship_data, get_ship_data_for
 from sbs_utils.procedural.gui.button import gui_button
 from sbs_utils.procedural.gui.icon import gui_icon
 from sbs_utils.procedural.inventory import  get_inventory_value, set_inventory_value
-from sbs_utils.procedural.query import get_science_selection, get_weapons_selection, to_object, get_comms_selection, get_data_set_value
+from sbs_utils.procedural.query import get_science_selection, get_weapons_selection, to_object, get_comms_selection, get_data_set_value, to_blob
 from sbs_utils.procedural.links import linked_to
 from sbs_utils.helpers import FrameContext, gui_text_escape
 from sbs_utils.vec import Vec3
@@ -531,3 +532,54 @@ def gm_selected_object_details(gm_id):
     lines.append(f"Current roles: {_gm_format_roles(obj)}")
     return "^".join(lines)
 
+def get_beam_blob_keys():
+    return [
+        "beamArcWidth",
+        "beamBarrelAngle",
+        "beamCycleTime",
+        "beamDamage",
+        "beamRange",
+        "beamTimer",
+        "beam_damage_coeff",
+        "beam_upgrade_coeff"
+    ]
+
+def gm_get_beam_data_for(id_or_obj):
+    blob = to_blob(id_or_obj)
+    beams = list()
+    if blob is None:
+        return beams
+    num_beams = blob.get("beamCount",0)
+
+    for i in range(num_beams):
+        arc_width = blob.get("beamArcWidth", i)
+        barrel_angle = blob.get("beamBarrelAngle", i)
+        cycle_time = blob.get("beamCycleTime", i)
+        damage = blob.get("beamDamage", i)
+        beam_range = blob.get("beamRange", i)
+        timer = blob.get("beamTimer", i)
+        damage_coeff = blob.get("beam_damage_coeff", i)
+        upgrade_coeff = blob.get("beam_upgrade_coeff", i)
+
+        data = {
+            "ship":id_or_obj,
+            "index":i,
+            "arc_width":arc_width,
+            "barrel_angle":barrel_angle,
+            "cycle_time":cycle_time,
+            "damage":damage,
+            "beam_range":beam_range,
+            "timer":timer,
+            "damage_coeff":damage_coeff,
+            "upgrade_coeff": upgrade_coeff
+        }
+        beams.append(data)
+    return beams
+
+def gm_list_box_beam_info(item):
+    gui_row("row-height: 1em;")
+    gui_text(f"Beam {item.get('index',0)}", "col-width: content;")
+    gui_blank()
+    # ib = gui_icon_button("icon_index: 155; color:red;")
+    ib = gui_button("X ","col-width: content;",data={"item":item})
+    gui_message(ib, "gm_delete_beam_from_ship")
