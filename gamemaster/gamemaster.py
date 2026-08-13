@@ -550,6 +550,8 @@ def gm_get_beam_data_for(id_or_obj):
     if blob is None:
         return beams
     num_beams = blob.get("beamCount",0)
+    if num_beams is None:
+        return beams
 
     for i in range(num_beams):
         arc_width = blob.get("beamArcWidth", i)
