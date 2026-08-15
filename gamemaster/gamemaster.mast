@@ -978,6 +978,7 @@ priority: 10 # Smaller number is higher priority
     task_schedule(gm_udpate_selected_ship_screen, data={"gm": gm, "selected_details": selected_details})
     yield success
 
+#region Selected ship - Beams
 === gm_udpate_selected_ship_screen
 " Update the ship screen with the last selected object's infomration. 
 metadata: ``` yaml
@@ -1039,7 +1040,81 @@ lb:
             # for key in keys:
             #     set_data_set_value()
     ->END
-    
+#endregion
+
+#region Selected ship - Loadout
+=== gm_selected_loadout
+metadata: ```
+type: gm_menu/selected/loadout
+icon: 40
+priority: 30
+```
+    sec = gui_sub_section()
+    gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
+    selected = get_inventory_value(gm, "gamemaster_prev_selection")
+    torps = gm_torp_get_data_for(selected)
+    with sec:
+        lb = gui_list_box(torps,"",item_template=gm_list_box_loadout_info)
+
+
+    task_schedule(gm_selected_loadout_update, data={"lb":lb,"gm":gm})
+    yield success
+
+=== gm_selected_loadout_update
+    yield fail if lb is None
+    yield fail if gm is None
+    selected = get_inventory_value(gm, "gamemaster_prev_selection")
+    torps = gm_torp_get_data_for(selected)
+    lb.items = torps
+    # gui_represent(lb)
+    await delay_sim(1)
+    jump gm_selected_loadout_update
+
+=== gm_add_or_remove_torp
+    print("Adding or removing torp")
+    if __ITEM__ is not None:
+        key = __ITEM__.data.get("key",0)
+        ship = __ITEM__.data.get("ship",None)
+        add = __ITEM__.data.get("add", True)
+        if ship is None:
+            yield fail
+        cur = get_data_set_value(ship, "{key}_NUM",0)
+        if add:
+            cur += 1
+            _max = get_data_set_value(ship, "{key}_MAX",0)
+            if cur > _max:
+                cur = _max
+        else:
+            cur -= 1
+            if cur < 0:
+                cur = 0
+        set_data_set_value(ship, "{key}_NUM", cur)
+        yield success
+    yield fail
+
+=== gm_change_torp_capacity
+" Change the max capacity of the specified torpedo for the selected ship.
+" Uses a modifier to be compatible with other sources of capacity increases/decreases.
+    print("Changing torp cap")
+    if __ITEM__ is not None:
+        data = __ITEM__.data
+        key = data.get("key")
+        yield fail if key is None
+        ship = data.get("ship")
+        if ship is None:
+            yield fail
+        add = data.get("add",True)
+        count = 1 if add else -1
+        exists = modifier_exists(ship, "GM")
+        cur_mods = modifiers_get_for_object(ship, "{key}_MAX")
+        for c in cur_mods:
+            if c.source == "GM":
+                count = c.value + count
+        modifier_add(ship, "{key}_MAX", count, "GM", 0, replace_if_exists=True)
+        yield success
+    yield fail
+
+#endregion
 
 === gm_old_comms_menu
 metadata: ```

@@ -1,7 +1,8 @@
+from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
 from sbs_utils.procedural.gui.message import gui_message
 from sbs_utils.procedural.gui.section import gui_sub_section
 from sbs_utils.procedural.gui.ship import gui_ship
-from sbs_utils.procedural.ship_data import get_ship_data, get_ship_data_for
+from sbs_utils.procedural.ship_data import get_ship_data, get_ship_data_for, ship_data_alien_keys
 from sbs_utils.procedural.gui.button import gui_button
 from sbs_utils.procedural.gui.icon import gui_icon
 from sbs_utils.procedural.inventory import  get_inventory_value, set_inventory_value
@@ -585,3 +586,50 @@ def gm_list_box_beam_info(item):
     # ib = gui_icon_button("icon_index: 155; color:red;")
     ib = gui_button("X ","col-width: content;",data={"item":item})
     gui_message(ib, "gm_delete_beam_from_ship")
+
+
+def gm_torp_get_data_for(id_or_obj):
+    """
+    Get basic data for each torp type available to the selected ship.
+    """
+    if id_or_obj is None:
+        return []
+    torps = torpedo_get_available_types_for_ship(id_or_obj)
+    ret = list()
+    for t in torps:
+        cur,_max = torpedo_get_count_for_ship(id_or_obj, t)
+        name = torp_get_attribute_value(t,"gui_text")
+        data = dict()
+        data["ship"] = id_or_obj
+        data["key"] = t
+        data["cur"] = cur
+        data["max"] = _max
+        data["name"] = name
+        ret.append(data)
+    return ret
+
+
+def gm_list_box_loadout_info(item):
+    # Name row
+    gui_row("row-height: 1.5em;")
+    name = item.get("name", "Name???")
+    gui_text(f"{name}")
+
+    # Current count row
+    cur = item.get("cur", 0)
+    gui_row("row-height: 2em;")
+    sub = gui_button("$text: - ;", "col-width: content;", data={"torp_item":item, "add":True})
+    gui_message(sub, "gm_add_or_remove_torp")
+    gui_text(f"$text: Current: {cur};")
+    add = gui_button("$text: + ;", "col-width: content;", data={"torp_item":item, "add":False})
+    gui_message(add, "gm_add_or_remove_torp")
+
+    # Max count row
+    _max = item.get("max",0)
+    gui_row("row-height: 2em;")
+    sub = gui_button("$text: - ;", "col-width: content;", data={"torp_item":item, "add":True})
+    gui_message(sub, "gm_change_torp_capacity")
+    gui_text(f"$text: Maximum: {_max};")
+    add = gui_button("$text: + ;", "col-width: content;", data={"torp_item":item, "add":True})
+    gui_message(add, "gm_change_torp_capacity")
+    
