@@ -2,7 +2,7 @@ from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship,
 from sbs_utils.procedural.gui.message import gui_message
 from sbs_utils.procedural.gui.section import gui_sub_section
 from sbs_utils.procedural.gui.ship import gui_ship
-from sbs_utils.procedural.ship_data import get_ship_data, get_ship_data_for, ship_data_alien_keys
+from sbs_utils.procedural.ship_data import get_ship_data
 from sbs_utils.procedural.gui.button import gui_button
 from sbs_utils.procedural.gui.icon import gui_icon
 from sbs_utils.procedural.inventory import  get_inventory_value, set_inventory_value
