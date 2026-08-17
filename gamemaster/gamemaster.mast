@@ -1183,7 +1183,11 @@ priority: 99
         test_gui_text_escape = gui_text_escape("{format_time(timer)}")
         gui_text("$text:Mission Elapsed Time:; justify: left;")
         t = gui_text(f"$text:{test_gui_text_escape};justify: right;")
-        if is_timer_set(SHARED, "time_limit"):
+
+        gui_row()
+        time_remaining_sub_section = gui_sub_section()
+        # if is_timer_set(SHARED, "time_limit"):
+        with time_remaining_sub_section:
             time = format_time_remaining(SHARED, "time_limit")
             gui_row("row-height: 2em; background: #1234566b;")
             gui_text("$text: Time Remaining:; justify: left;")
@@ -1199,6 +1203,30 @@ priority: 99
             gui_message(p1, gm_add_remaining_time)
             gui_message(m5, gm_add_remaining_time)
             gui_message(p5, gm_add_remaining_time)
+
+        # Spacer row
+        gui_row("row-height: 2em;")
+        gui_blank()
+
+        # Allow GM to enforce a time limit
+        gui_row("row-height: 1em;")
+        time = gui_input("msg: Time Limit;", var="gm_set_time_limit")
+        gui_row("row-height: 1em;")
+        limit = gui_button("Set time limit")
+        on gui_message(limit):
+            time_limit = gui_get_variable("gm_set_time_limit", 30)
+            if isinstance(time_limit, str):
+                time_limit = int(time_limit)
+            set_timer(SHARED, "time_limit", minutes=time_limit)
+            gui_show(time_remaining_sub_section)
+
+        gui_row("row-height: 1em;")
+        rtl = gui_button("Remove Time Limit")
+        on gui_message(rtl):
+            clear_timer(SHARED, "time_limit")
+            gui_hide(time_remaining_sub_section)
+
+
         task_schedule(gm_elapsed_time_update, data={"t": t, "sec": sec, "remaining":remaining})
     yield success
 
