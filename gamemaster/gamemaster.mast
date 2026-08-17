@@ -56,6 +56,8 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     cambot_id = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
     camera_id = cambot_id
     cambot = to_object(cambot_id)
+
+    set_interval(0, "gui_update_interval", "gui_update_interval_signal", 1) # This should be used by all the gm GUIs, don't need more than one
     if cambot_id is None or cambot is None:
         #
         # has_science_scan enables friendly eyes processing
@@ -1073,11 +1075,14 @@ priority: 30
 === gm_add_or_remove_torp
     print("Adding or removing torp")
     if __ITEM__ is not None:
-        key = __ITEM__.data.get("key",0)
-        ship = __ITEM__.data.get("ship",None)
+        torp = __ITEM__.data.get("torp_item")
+        yield fail if torp is None
+        key = torp.get("key",0)
+        ship = torp.get("ship",None)
         add = __ITEM__.data.get("add", True)
         if ship is None:
             yield fail
+        print("Item not none")
         cur = get_data_set_value(ship, "{key}_NUM",0)
         if add:
             cur += 1
@@ -1103,6 +1108,7 @@ priority: 30
         ship = data.get("ship")
         if ship is None:
             yield fail
+        print("Item not none")
         add = data.get("add",True)
         count = 1 if add else -1
         exists = modifier_exists(ship, "GM")
