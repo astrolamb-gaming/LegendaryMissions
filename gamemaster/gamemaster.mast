@@ -57,7 +57,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     camera_id = cambot_id
     cambot = to_object(cambot_id)
 
-    set_interval(0, "gui_update_interval", "gui_update_interval_signal", 1) # This should be used by all the gm GUIs, don't need more than one
+
     if cambot_id is None or cambot is None:
         #
         # has_science_scan enables friendly eyes processing
@@ -73,6 +73,9 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         stations_friendly = any_role("__npc__,__player__")
         #@link extra_scan_source: All the sources which provide scan information to this object
         link(cambot_id,"extra_scan_source" ,stations_friendly)
+
+        set_interval(client_id, "gui_update_interval", "gui_update_interval_signal", 1) # One for each GM, to simplify interval signal usage
+    
     last_sci = cambot_id
     #
     # Should have a way to get all sides - now we do!
@@ -1254,6 +1257,12 @@ priority: 99
     jump gm_elapsed_time_update
 
 #endregion
+
+# We INTENTIONALLY don't use Shared because this is on a per-gm basis.
+//signal/gui_update_interval_signal
+    # get_inventory_value(TIMER_AGENT_ID, "gm_update_list", [])
+    gm_update_gui_elements(TIMER_AGENT_ID)
+
 
 
 //shared/signal/game_started

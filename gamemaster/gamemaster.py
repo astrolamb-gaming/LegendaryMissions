@@ -1,3 +1,4 @@
+from sbs_utils.agent import Agent
 from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
 from sbs_utils.procedural.gui.message import gui_message
 from sbs_utils.procedural.gui.section import gui_sub_section
@@ -16,7 +17,7 @@ from sbs_utils.procedural.gui.dropdown import gui_drop_down
 from sbs_utils.procedural.comms import comms_broadcast
 from sbs_utils.procedural.roles import role
 from sbs_utils.procedural.gui import gui_task_for_client, gui_region
-from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type, gui_get_variable
+from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type, gui_get_variable, AWAIT
 
 
 def gamemaster_show_nav_area(ORIGIN_ID, pos, size_delta, text, selection_type, color):
@@ -633,3 +634,34 @@ def gm_list_box_loadout_info(item):
     add = gui_button("$text: + ;", "col-width: content;", data={"torp_item":item, "add":True})
     gui_message(add, "gm_change_torp_capacity")
     
+
+def gm_add_gui_element_to_update_list(layout_item, cb):
+    id = layout_item.client_id
+    if id is None:
+        return
+    items = get_inventory_value(id, "gm_update_list", [])
+    items.append((layout_item,cb))
+    set_inventory_value(id, "gm_update_list", items)
+
+def gm_update_gui_elements(client_id):
+    items = get_inventory_value(id, "gm_update_list", [])
+    for item, cb in items:
+        if item and cb:
+            try:
+                if item.is_hidden():
+                    # don't need to change stuff if it's not being displayed
+                    continue
+                if callable(cb):
+                    cb(item)
+                    item.mark_layout_dirty()
+                    continue
+                # Now we treat cb as a label and run it...
+                if isinstance(cb, Agent):
+                    yield AWAIT(gui_sub_task_schedule(cb))
+                    continue
+                # if its none of these, we do nothing
+            except:
+                print("layout item not valid on update")
+                continue
+
+        
