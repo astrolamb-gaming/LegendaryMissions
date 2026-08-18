@@ -224,7 +224,6 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
         else:
             menu_panel = gss_row
         content_panels.append(gss_row)
-        gss_row.show(False)
 
             
         gss = gui_sub_section()
@@ -980,7 +979,7 @@ priority: 10 # Smaller number is higher priority
     selected_details = gui_text_area("Select an object in science or weapons to view details.")
 
     gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
-    task_schedule(gm_udpate_selected_ship_screen, data={"gm": gm, "selected_details": selected_details})
+    gui_sub_task_schedule(gm_udpate_selected_ship_screen, data={"gm": gm, "selected_details": selected_details})
     yield success
 
 #region Selected ship - Beams
@@ -1062,7 +1061,8 @@ priority: 30
         lb = gui_list_box(torps,"",item_template=gm_list_box_loadout_info)
 
 
-    task_schedule(gm_selected_loadout_update, data={"lb":lb,"gm":gm})
+
+    gui_sub_task_schedule(gm_selected_loadout_update, data={"lb":lb,"gm":gm})
     yield success
 
 === gm_selected_loadout_update
@@ -1228,6 +1228,16 @@ priority: 99
         on gui_message(rtl):
             clear_timer(SHARED, "time_limit")
             gui_hide(time_remaining_sub_section)
+        gui_row("row-height: 1em;")
+        eb = gui_button("End Game")
+        on gui_message(eb):
+            # clear_timer(SHARED, "time_limit")
+            # jump task_end_game
+            START_TEXT = "Mission time has run out!"
+            GAME_STARTED = False
+            GAME_ENDED = True
+            music_play_sting("victory")
+            signal_emit("show_game_results", None)
 
 
         task_schedule(gm_elapsed_time_update, data={"t": t, "sec": sec, "remaining":remaining})
