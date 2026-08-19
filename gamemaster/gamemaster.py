@@ -634,34 +634,3 @@ def gm_list_box_loadout_info(item):
     add = gui_button("$text: + ;", "col-width: content;", data={"torp_item":item, "add":True})
     gui_message(add, "gm_change_torp_capacity")
     
-
-def gm_add_gui_element_to_update_list(layout_item, cb):
-    id = layout_item.client_id
-    if id is None:
-        return
-    items = get_inventory_value(id, "gm_update_list", [])
-    items.append((layout_item,cb))
-    set_inventory_value(id, "gm_update_list", items)
-
-def gm_update_gui_elements(client_id):
-    items = get_inventory_value(id, "gm_update_list", [])
-    for item, cb in items:
-        if item and cb:
-            try:
-                if item.is_hidden():
-                    # don't need to change stuff if it's not being displayed
-                    continue
-                if callable(cb):
-                    cb(item)
-                    item.mark_layout_dirty()
-                    continue
-                # Now we treat cb as a label and run it...
-                if isinstance(cb, Agent):
-                    yield AWAIT(gui_sub_task_schedule(cb))
-                    continue
-                # if its none of these, we do nothing
-            except:
-                print("layout item not valid on update")
-                continue
-
-        

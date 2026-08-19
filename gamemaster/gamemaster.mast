@@ -5,7 +5,7 @@ dolly = 50
 orbit = 180.0
 do_move = 0
 property_pane = None
-info_panel_width = "300px"
+info_panel_width = "40"
 
 default SETTINGS = settings_get_defaults()
 default shared GAMEMASTER_CONSOLE = SETTINGS.get("GAMEMASTER", {"enable": True})
@@ -115,7 +115,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
 
     # Build the left bar
     # This is for the menu buttons
-    parent = gui_section(f"area:0,40px,{info_panel_width},100;")
+    parent = gui_section(f"area:0,40px,{info_panel_width},100; background-color: #11315018;")
     main_menu_list_box = None
     menu_labels = gm_get_menu_items_tree()
     # Fail-safe for if no gm_menu labels are present...
@@ -188,7 +188,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
                 icon_color = sub.get_inventory_value("icon_color")
                 if icon_color is None:
                     icon_color = "#404ad8"
-                button = gui_icon_button(f"icon_index: {icon};color: {icon_color};")
+                button = gui_icon_button(f"icon_index: {icon};color: {icon_color};", "color: #01234567;")
                 buttons.append(button)
 
             content_panel_buttons[m] = buttons
@@ -847,9 +847,17 @@ ship: None
         comms_id = SCIENCE_SELECTED_ID
         if comms_id==0:
             comms_id = SCIENCE_ORIGIN_ID
+
+        gamemaster_show_nav_area(SCIENCE_ORIGIN_ID, pos, 0, "Game Master", "lmb", "#040")
+
+        obj = to_object(SCIENCE_SELECTED_ID)
+        if obj is None:
+            jump END
+        if has_role(SCIENCE_SELECTED_ID, "gamemaster"):
+            ->END
+        
         gui_set_variable("gm_selection", SCIENCE_SELECTED_ID)
         set_inventory_value(SCIENCE_ORIGIN_ID, "gamemaster_prev_selection", SCIENCE_SELECTED_ID)
-        gamemaster_show_nav_area(SCIENCE_ORIGIN_ID, pos, 0, "Game Master", "lmb", "#040")
         
         prev_comms = get_comms_selection(SCIENCE_ORIGIN_ID)
         set_comms_selection(SCIENCE_ORIGIN_ID, comms_id)
@@ -979,24 +987,14 @@ priority: 10 # Smaller number is higher priority
     selected_details = gui_text_area("Select an object in science or weapons to view details.")
 
     gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
-    gui_sub_task_schedule(gm_udpate_selected_ship_screen, data={"gm": gm, "selected_details": selected_details})
+
+    on change get_inventory_value(gm, "gamemaster_prev_selection"):
+        # if not selected_details.is_hidden:
+        details_text = gm_selected_object_details(gm)
+        selected_details.update(details_text)
     yield success
 
 #region Selected ship - Beams
-=== gm_udpate_selected_ship_screen
-" Update the ship screen with the last selected object's infomration. 
-metadata: ``` yaml
-gm:
-selected_details:
-```
-    yield fail if gm is None
-
-    if selected_details is not None:
-        details_text = gm_selected_object_details(gm)
-        selected_details.update(details_text)
-
-    await delay_sim(1)
-    jump gm_udpate_selected_ship_screen
 
 === gm_selected_beams
 metadata: ``` yaml
@@ -1025,9 +1023,11 @@ lb:
     selected = get_inventory_value(gm, "gamemaster_prev_selection")
     beams = gm_get_beam_data_for(selected)
     lb.items = beams
-    await delay_sim(1)
-    jump gm_selected_beams_update
-    # yield success
+    on change get_inventory_value(gm, "gamemaster_prev_selection"):
+        selected = get_inventory_value(gm, "gamemaster_prev_selection")
+        beams = gm_get_beam_data_for(selected)
+        lb.items = beams
+    yield success
 
 
 === gm_delete_beam_from_ship
@@ -1060,20 +1060,25 @@ priority: 30
     with sec:
         lb = gui_list_box(torps,"",item_template=gm_list_box_loadout_info)
 
-
-
-    gui_sub_task_schedule(gm_selected_loadout_update, data={"lb":lb,"gm":gm})
+        on change get_inventory_value(gm, "gamemaster_prev_selection"):
+            # if not sec.is_hidden:
+            selected = get_inventory_value(gm, "gamemaster_prev_selection")
+            torps = gm_torp_get_data_for(selected)
+            lb.items = torps
+            gui_represent(lb)
     yield success
 
-=== gm_selected_loadout_update
-    yield fail if lb is None
-    yield fail if gm is None
-    selected = get_inventory_value(gm, "gamemaster_prev_selection")
-    torps = gm_torp_get_data_for(selected)
-    lb.items = torps
-    # gui_represent(lb)
-    await delay_sim(1)
-    jump gm_selected_loadout_update
+# === gm_selected_loadout_update
+#     yield fail if lb is None
+#     yield fail if gm is None
+#     selected = get_inventory_value(gm, "gamemaster_prev_selection")
+#     torps = gm_torp_get_data_for(selected)
+#     lb.items = torps
+#     # gui_represent(lb)
+#     if once:
+#         yield success
+#     await delay_sim(1)
+#     jump gm_selected_loadout_update
 
 === gm_add_or_remove_torp
     print("Adding or removing torp")
@@ -1184,10 +1189,13 @@ priority: 99
         gui_row("row-height: 2em; background: #1234566b;")
         timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
         test_gui_text_escape = gui_text_escape("{format_time(timer)}")
-        gui_text("$text:Mission Elapsed Time:; justify: left;")
+        elapsed_time = gui_text("$text:Mission Elapsed Time:; justify: left;")
         t = gui_text(f"$text:{test_gui_text_escape};justify: right;")
-
-        gui_row()
+        on change get_counter_elapsed_seconds(0, "Mission_Elapsed_Time"):
+            timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
+            test_gui_text_escape = gui_text_escape("{format_time(timer)}")
+            t.update(f"$text:{test_gui_text_escape};justify: right;")
+        gui_row("row-height: 2em;")
         time_remaining_sub_section = gui_sub_section()
         # if is_timer_set(SHARED, "time_limit"):
         with time_remaining_sub_section:
@@ -1195,6 +1203,9 @@ priority: 99
             gui_row("row-height: 2em; background: #1234566b;")
             gui_text("$text: Time Remaining:; justify: left;")
             remaining = gui_text(f"$text:{time};justify: right;")
+            on change get_time_remaining(SHARED, "time_limit"):
+                time = format_time_remaining(SHARED, "time_limit")
+                remaining.update(f"$text:{time};justify: right;")
             gui_row("row-height: 2em;")
             m1 = gui_button(f"$text:-1 min", data={"minutes":-1})
             p1 = gui_button(f"$text:+1 min", data={"minutes":1})
@@ -1213,9 +1224,10 @@ priority: 99
 
         # Allow GM to enforce a time limit
         gui_row("row-height: 1em;")
-        time = gui_input("msg: Time Limit;", var="gm_set_time_limit")
+        gui_text("$text:Set Time Limit: ;")
+        time = gui_input("msg: Time Limit;", "col-width: content;", var="gm_set_time_limit")
         gui_row("row-height: 1em;")
-        limit = gui_button("Set time limit")
+        limit = gui_button("Time limit")
         on gui_message(limit):
             time_limit = gui_get_variable("gm_set_time_limit", 30)
             if isinstance(time_limit, str):
@@ -1240,7 +1252,7 @@ priority: 99
             signal_emit("show_game_results", None)
 
 
-        task_schedule(gm_elapsed_time_update, data={"t": t, "sec": sec, "remaining":remaining})
+        # task_schedule(gm_elapsed_time_update, data={"t": t, "sec": sec, "remaining":remaining})
     yield success
 
 === gm_add_remaining_time
@@ -1252,27 +1264,7 @@ priority: 99
     timer_add_time(SHARED, "time_limit", seconds, minutes)
     ->END
 
-=== gm_elapsed_time_update
-" Updates the elapsed time on the gamemaster's screen. 
-    if t is None or sec is None:
-        print("Timer text not specified")
-        ->END
-    v = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
-    t.update(f"$text:{format_time(v)};justify:right;")
-    if remaining is not None:
-        v = format_time_remaining(SHARED, "time_limit")
-        remaining.update(f"$text:{v};justify: right;")
-    gui_represent(sec)
-    await delay_sim(1)
-    jump gm_elapsed_time_update
-
 #endregion
-
-# We INTENTIONALLY don't use Shared because this is on a per-gm basis.
-//signal/gui_update_interval_signal
-    # get_inventory_value(TIMER_AGENT_ID, "gm_update_list", [])
-    gm_update_gui_elements(TIMER_AGENT_ID)
-
 
 
 //shared/signal/game_started
