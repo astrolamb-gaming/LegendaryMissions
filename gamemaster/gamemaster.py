@@ -201,7 +201,10 @@ def gm_build_menu_icons(item):
     if icon is not None:
         GAMEMASTER_CONSOLE_ICON_SIZE = gui_get_variable("GAMEMASTER_CONSOLE_ICON_SIZE")
         gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
-        gui_icon(f"icon_index: {icon};color: {icon_color};")
+        if isinstance(icon, int) or icon.isdigit():
+            gui_icon(f"icon_index: {icon};color: {icon_color};")
+        else:
+            gui_text(f"$text: {icon}; color: {icon_color}")
     else:
         gui_text(item.get_inventory_value("type"))
         print("Icon is None")
@@ -217,6 +220,57 @@ def sort_menu_labels(a,b):
     a1 = a.get_inventory_value("priority")
     b1 = b.get_inventory_value("priority")
     return a1 > b1
+
+def gm_spawn_type_button(props="", style=""):
+    button = gui_sub_section(f"click_background: #5555;click_text:;{style};")
+    with button:
+        gui_row("row-height: 1em;")
+        gui_text(f"{props}")
+    return button
+
+origins_sides_roles = None
+def gm_get_origins_sides_roles() -> dict:
+    """
+    Gets sets of origins, sides, and roles defined in shipData as a dict.
+    Caches the data after first use, since the data won't change.
+    NOTE: Sides that are specified in shipData may not be initialized in-game!
+    
+    Returns:
+        dict: A dictionary containing origins, roles, and sides used in shipData.
+    """
+    global origins_sides_roles
+    if origins_sides_roles is not None:
+        return origins_sides_roles
+    data = get_ship_data()["#ship-list"] # A list of ship dict entries
+    origin_set = set()
+    side_set = set()
+    role_set = set()
+
+    for ship in data:
+        # key = ship.get("key")
+        # print(key)
+        o = ship.get("origin")
+        if o is not None:
+            origin_set.add(o + " ")
+        s = ship.get("side")
+        if s is not None:
+            side_set.add(s + " ")
+        r = ship.get("roles")
+        if r is not None:
+            r_list = r.split(",")
+            for _r in r_list:
+                role_set.add(_r.strip() + " ")
+        else:
+            key = ship.get("key")
+            print(f"{key} doesn't have a role...")
+
+    origins_sides_roles = {
+        "origins": origin_set,
+        "sides": side_set,
+        "roles": role_set
+    }
+    return origins_sides_roles
+
 
 
 def filter_ship_data_generically(text):
@@ -249,7 +303,6 @@ def filter_ship_data_generically(text):
         side = ship.get("side", "")
         roles = ship.get("roles", "")
         long_desc = ship.get("long_desc", "")
-        short_desc = ship.get("desc", "")
 
         # Join all the text into one string
         haystack = "|".join([
@@ -258,8 +311,7 @@ def filter_ship_data_generically(text):
             str(origin),
             str(side),
             str(roles),
-            str(long_desc),
-            str(short_desc),
+            str(long_desc)
         ]).lower()
 
         if needle in haystack:

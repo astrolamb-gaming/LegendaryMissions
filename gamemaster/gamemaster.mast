@@ -127,6 +127,7 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     with gui_sub_section():
         gui_row()
         with gui_sub_section(f"col-width: {GAMEMASTER_CONSOLE_ICON_SIZE}px"):
+        # with gui_sub_section():
             main_menu_list_box = gui_list_box(sorted_menu_labels, "", item_template=gm_build_menu_icons, select=True)
             main_menu_list_box.value = sorted_menu_labels[0]
 
@@ -188,7 +189,10 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
                 icon_color = sub.get_inventory_value("icon_color")
                 if icon_color is None:
                     icon_color = "#404ad8"
-                button = gui_icon_button(f"icon_index: {icon};color: {icon_color};", "color: #01234567;")
+                if isinstance(icon, int) or icon.isdigit():
+                    button = gui_icon_button(f"icon_index: {icon};color: {icon_color};", "color: #01234567;")
+                else:
+                    button = gui_button(f"$text: {icon}; color: {icon_color};"," col-width: content;")
                 buttons.append(button)
 
             content_panel_buttons[m] = buttons
@@ -899,7 +903,7 @@ ship: None
 === gm_menu_terrain
 metadata: ``` yaml
 type: gm_menu/terrain
-icon_index: 13
+icon_index: Terrain 
 icon_color: "#999872"
 priority: 80 # Smaller number is higher priority
 ```
@@ -926,52 +930,7 @@ priority: 100 # Smaller number is higher priority
     yield success
 
 
-=== gm_menu_spawn
-metadata: ``` yaml
-type: gm_menu/spawn
-icon_index: 156
-icon_color: "blue"
-priority: 20 # Smaller number is higher priority
-```
-    debug_print("Spawn - this should not appear")
-    gui_button("Testing Spawn", f"color: {icon_color}")
-    gui_row()
-    gui_blank()
-    yield success
 
-
-=== gm_menu_spawn_ships
-metadata: ```
-type: gm_menu/spawn/ships
-icon_index: 140
-```
-    gui_row("row-height: 1.5em;")
-    filt = gui_input("$text:light;")
-    gui_row()
-
-    ship_list = filter_ship_data_generically(filt.value)
-    print(f"Ship list length: {len(ship_list)}")
-
-    list_box = gui_list_box(ship_list, "", item_template=gm_ship_spawn_select_template, select=True)
-
-    on change filt.value:
-        print("New value: {filt.value}")
-        ship_list = filter_ship_data_generically(filt.value)
-        list_box.items = ship_list
-
-    # This row shows additional details for the selected ship
-    gui_row()
-    gui_text(f"Details here....")
-
-    # Spawn row
-    gui_row("row-height: 1.5em;")
-    spawn_button = gui_button("Spawn")
-    on gui_message(spawn_button):
-        sel = list_box.get_selected()
-        print(f"Spawning: {sel.get('art_id')}")
-
-
-    yield success
 
 
 === gm_menu_selected
@@ -1050,7 +1009,7 @@ lb:
 === gm_selected_loadout
 metadata: ```
 type: gm_menu/selected/loadout
-icon: 40
+icon_index: Loadout 
 priority: 30
 ```
     sec = gui_sub_section()
@@ -1067,6 +1026,58 @@ priority: 30
             lb.items = torps
             gui_represent(lb)
     yield success
+
+
+=== gm_show_all_torp_types
+" Build a layout with all possible torpedo types.
+" Allows the user to modify the torpedo types available to the selected ship.
+" Must be a player ship, a cargo ship, or station. NPC ships do not currently support torpedoes.
+" Cargo ships and stations can have torpedoes in inventory but cannot use them, but player ships can take them to use.
+
+    sec = gui_sub_section()
+    gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
+    selected = get_inventory_value(gm, "gamemaster_prev_selection")
+
+    all_torps_list = []
+    current_torps_list = []
+
+    current_torps = None
+    available_torps = None
+    with sec:
+        gui_row("row-height: 1em;")
+        gui_text("Current")
+        gui_row()
+        current_torps = gui_list_box([],"")
+    
+    sec2 = gui_sub_section()
+    with sec2:
+        gui_row("row-height: 1em;")
+        gui_text("Available")
+        gui_row()
+        available_torps = gui_list_box([],"")
+    
+    on change current_torps.value:
+        all_torps_list.append(current_torps.value)
+        current_torps_list.remove(current_torps.value)
+        available_torps.items = all_torps_list
+        current_torps.items = current_torps_list
+        # TODO: Remove the torp type from the ship
+    
+    on change available_torps.value:
+        current_torps_list.append(available_torps.value)
+        all_torps_list.remove(available_torps.value)
+        available_torps.items = all_torps_list
+        current_torps.items = current_torps_list
+        # TODO: Add the torp type to the ship
+
+    on change get_inventory_value(gm, "gamemaster_prev_selection"):
+        available_torps = []
+        # TODO: Finish this
+
+
+    yield success
+
+
 
 # === gm_selected_loadout_update
 #     yield fail if lb is None
