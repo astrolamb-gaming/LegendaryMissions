@@ -262,7 +262,10 @@ gui_reroute_clients("client_main")
         on gui_message(save_ic):
             # Capture the current crew's hulls + names into SHIP_LOADOUT so the
             # saved preset reproduces the same ships for the next crew.
-            player_loadout_capture(to_object_list(role("default_player_ship")))
+            # `& role("__player__")` to match the capture at the start button below:
+            # the cull strips __player__ from unused slots but leaves
+            # default_player_ship, so the bare role can name ships on their way out.
+            player_loadout_capture(to_object_list(role("default_player_ship") & role("__player__")))
             game_code_presets_save_code(game_code_encode(WORLD_SELECT, with_loadout=True), GAME_CODE_NAME)
             jump game_code_reload
         # copy_ic = gui_icon("icon_index: 134; color: white;", "click_tag: gc_copy;")
@@ -290,10 +293,26 @@ gui_reroute_clients("client_main")
         # name comes from whatever mod declared the label.
         gui_row("row-height: 30px;")
         music_choices = music_get_list()
-        gui_blank(1, "col-width: 6em;")
+        # A LABEL, not a blank: the dropdown shows the bank that is selected ("random",
+        # or a mod's display name), which tells the operator nothing about what the
+        # control IS. The 6em here was an empty spacer of the same width.
+        gui_text("$text: Music;justify:right;", "col-width: 6em;")
         music_dd = gui_drop_down(f"$text: {get_shared_variable('MUSIC_SELECT', SETTINGS.get('MUSIC_SELECT', 'random'))}; list: {','.join(['random'] + [m.display_name for m in music_choices])}")
         on gui_message(music_dd):
             shared MUSIC_SELECT = music_dd.value
+
+        # WHICH CREW staffs consoles nobody named. Guarded on there being any: music's row is
+        # unconditional because a "default" bank always exists, and crew genuinely can be
+        # empty - a mission that declares no roster has to get exactly the panel it got
+        # before. Placed AFTER map_apply_defaults above, so a map's `Defaults: CREW_SELECT`
+        # reads back as the current pick rather than being overwritten by a stale one.
+        crew_choices = crew_get_list()
+        if len(crew_choices) > 0:
+            gui_row("row-height: 30px;")
+            gui_text("$text: Crew;justify:right;", "col-width: 6em;")
+            crew_dd = gui_drop_down(f"$text: {get_shared_variable('CREW_SELECT', SETTINGS.get('CREW_SELECT', ''))}; list: {','.join(['none', 'random'] + [c.display_name for c in crew_choices])}")
+            on gui_message(crew_dd):
+                shared CREW_SELECT = crew_dd.value
 
         gui_row()
         gui_property_list_box(name="Options")

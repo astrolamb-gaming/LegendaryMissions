@@ -3,6 +3,8 @@ import common_console_select.mast
 import manual_weapons.mast
 import gui_screen_tabs.py
 import results_helpers.py
+import manual_beams_helpers.py
+import tether_indicator.py
 import game_results.mast
 
 import server_console.py

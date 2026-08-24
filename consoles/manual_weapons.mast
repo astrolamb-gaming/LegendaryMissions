@@ -6,19 +6,27 @@ shared manual_beams_version_task = None
 
 #
 # A task to trigger any manual beam console
-# to update 
+# to update
 #
 ===== check_all_manual_beams   ======
-    manual_beams_version +=1 
+    manual_beams_version +=1
     await delay_sim(3)
     jump check_all_manual_beams
 
 
+#
+# The HIT flash is a 2 second timer on the SHOOTING ship, so the panel keeps no state of
+# its own - is_timer_finished answers True for a timer that was never set, which is
+# exactly "not hit". The timer's own signal is what brings the panel back, so nothing
+# polls it and no clear task has to be scheduled and remembered.
+#
+//shared/signal/manual_beams_hit_over
+    shared manual_beams_version += 1
+    ->END
+
 
 # this could be a subtask or routed
 ==== manual_weapons_start ====
-
-
 
     #//gui/normal_weap
 
@@ -29,23 +37,74 @@ shared manual_beams_version_task = None
         manual_beams_version_task = task_schedule(check_all_manual_beams)
 
     ship_id = sbs.get_ship_of_client(client_id)
-    # mast_scheduler.page.add_console_widget("3dview")
-    gui_update_widget_list("3dview")
-    gui_section("area: 0,70,600px,90;")
-    with gui_sub_section():
-        gui_layout_widget("3dview")
-        source = Vec3(0,0, 0)
-        ## source = source.rotate_around(Vec3(0,0,0), 0, orbit, 0)
-    #    gui_cinematic_full_control(client_id, ship_id, source, ship_id, source)
-        gui_cinematic_full_control(client_id, 0, source, 0, source)
 
-    manual =  gui_region("area: 0,90,600px,100;orientation:BT;")
+    #
+    # The 3dview is GONE. The called-shot panel shows the target's own flat art
+    # (<artfileroot>1024.png) instead, which costs a 156px square rather than the bottom
+    # fifth of the console - so the 2d view gets that whole band back. Removed rather
+    # than merely not placed: gui_layout_widget ADDS to the console's widget list, so a
+    # console that has already been through here is still carrying one.
+    #
+    gui_update_widget_list(remove_widgets="3dview")
 
+    # The Manual checkbox and the target's name. One strip along the bottom; the square
+    # stands above and to the right of it, in its own regions.
+    manual = gui_region("area: 0, 96-72px, 600px, 96;")
 
-    latest_target = None
+    # TWO REGIONS, ONE RECT. The layout engine has no overlapping siblings, so this is
+    # the only way a label gets on top of a bar: the same absolute area declared twice,
+    # the second raised with layer:. manual_beams_helpers owns both strings for exactly
+    # that reason - they cannot drift if nobody can spell them separately.
+    mb_bars = gui_region(manual_beams_area())
+    mb_labels = gui_region(manual_beams_label_area())
+
+    # "On screen" - the same tool science has, on the console that already has the enemy
+    # selected. Its own strip UNDER the manual panel rather than a row inside it: the
+    # panel is torn down and rebuilt every 3 seconds (check_all_manual_beams), which
+    # would take an open drop-down with it.
+    on_screen_sec = gui_region("area: 0,96,300px,100;")
+    with gui_rebuild(on_screen_sec):
+        gui_row("row-height: 35px;")
+        # viewscreen_home_ship, not get_ship_of_client: a shot assigns its console to the
+        # SUBJECT. It only ever reassigns mainscreen consoles, so the rest of this file is
+        # right as it stands - but this is the call that means "my own ship" regardless.
+        _weap_ship = viewscreen_home_ship(client_id)
+        # The list comes from the library so the labels here and the mode names there
+        # cannot drift, exactly as the science block does it. VIEWSCREEN_PLAN.md
+        default on_screen = viewscreen_label_for(viewscreen_mode(_weap_ship))
+        on_screen_dd = gui_drop_down(viewscreen_shot_props(on_screen), var="on_screen")
+        on gui_message(on_screen_dd):
+            _ship = viewscreen_home_ship(client_id)
+            _tgt = get_weapons_selection(_ship)
+            viewscreen_set(_ship, viewscreen_mode_for(on_screen), _tgt)
+            # Remember what WE put on screen, so the re-point below can tell a shot this
+            # console started from one science set up.
+            set_inventory_value(client_id, "WEAP_VIEWER_SUBJECT", _tgt)
 
     on change get_weapons_selection(ship_id):
+        # The shot follows the target, but only while it is still showing what weapons
+        # put there - re-targeting must not yank a contact science asked to look at.
+        _ship = viewscreen_home_ship(client_id)
+        _tgt = get_weapons_selection(_ship)
+        _ours = get_inventory_value(client_id, "WEAP_VIEWER_SUBJECT", 0)
+        if viewscreen_is_live(_ship) and viewscreen_subject(_ship) == _ours:
+            viewscreen_set(_ship, viewscreen_mode(_ship), _tgt)
+            set_inventory_value(client_id, "WEAP_VIEWER_SUBJECT", _tgt)
         jump  manual_weapons_show
+
+    # The bars are a gauge, and a 3 second ticker is not a gauge's refresh rate. This
+    # repaints the moment the target actually takes damage. The ticker still covers
+    # everything else it always covered - range, existence, the target going away - so
+    # it does not have to be shortened, which would only tear the panel down more often.
+    on change manual_beams_signature(get_weapons_selection(ship_id)):
+        jump manual_weapons_show
+
+    # Grabbing and letting go have to show at once, not on the next 3 second tick - a
+    # readout that lags the button by three seconds reads as a button that did not work.
+    # The signature deliberately leaves RANGE out, so the panel is not torn down every
+    # tick while the number moves; the ticker below refreshes that.
+    on change manual_tether_signature(ship_id):
+        jump manual_weapons_show
 
     on change manual_beams_version:
         cc= sbs.get_type_of_client(client_id)
@@ -65,13 +124,15 @@ shared manual_beams_version_task = None
     ship = to_object(ship_id)
     yield fail if ship is None
 
-    sbs.set_main_view_modes(client_id, "no_draw","a","cinematic")
+    # The square is empty in this state, and a tether is exactly the thing worth putting
+    # in an empty square. Tested HERE rather than in manual_weapons_show because every
+    # way the panel gives the square up - Manual off, no lock, target out of range, the
+    # checkbox handler - lands on this label.
+    jump manual_weapons_tether if manual_tether_partner(ship_id) != 0
 
     with gui_rebuild(manual):
-        gui_row("row-height: 3em;")
-        #ib = gui_icon("icon_index:112;color:yellow;", style="click_color: blue; click_text:_; click_font:gui-5; click_tag:manual_beams")
-        #on gui_click(ib):
-        cb = gui_checkbox("$text:Manual;state:True")
+        gui_row("row-height: 72px;")
+        cb = gui_checkbox("$text:Manual;state:True", "col-width: 120px;")
         cb.value = ship.get_inventory_value("MANUAL_BEAMS_ON", False)
         on gui_message(cb):
             ship_id = sbs.get_ship_of_client(client_id)
@@ -79,10 +140,17 @@ shared manual_beams_version_task = None
             if ship_id != 0 and ship is not None:
                 ship.set_inventory_value("MANUAL_BEAMS_ON", not ship.get_inventory_value("MANUAL_BEAMS_ON", False))
             jump manual_weapons_maximize
-        gui_blank(4)
-        gui_row()
         gui_blank()
 
+    # Emptied, not left stale - a region keeps whatever it last drew. Each still gets a
+    # row and a blank: a swap with no content at all leaves the engine holding the old
+    # buffer.
+    with gui_rebuild(mb_bars):
+        gui_row()
+        gui_blank()
+    with gui_rebuild(mb_labels):
+        gui_row()
+        gui_blank()
 
     yield idle
 
@@ -107,24 +175,17 @@ shared manual_beams_version_task = None
 
     jump manual_weapons_minimize if dist > 2000
 
-    s_pos = Vec3(ship.pos)
-    t_pos = Vec3(_target.pos)
-    diff = t_pos - s_pos
-    n = diff.unit()
-    source = n * 100
-
-    t = Vec3(0,0, 0)
-
-    gui_cinematic_full_control(client_id, target_id, source, target_id, t)
-
     name = _target.comms_id
-    # Drawing is bottom to top set in region style
+
+    # What the gunner has loaded, and whether a hit is currently being announced. Both
+    # live on the ship, not on this console, so every weapons console on the bridge shows
+    # the same thing.
+    _armed = get_inventory_value(ship_id, "MANUAL_SYSTEM")
+    _hit = not is_timer_finished(ship_id, "MANUAL_HIT")
+
     with gui_rebuild(manual):
-        gui_row("row-height: 3em;")
-        # Bottom row 
-        # ib = gui_icon("icon_index:112;color:green;", style="click_color: blue; click_text:_; click_font:gui-5; click_tag:min_manual_beams")
-        # on gui_click(ib):
-        cb = gui_checkbox("$text:Manual;state:True")
+        gui_row("row-height: 72px;")
+        cb = gui_checkbox("$text:Manual;state:True", "col-width: 120px;")
         cb.value = ship.get_inventory_value("MANUAL_BEAMS_ON", False)
         on gui_message(cb):
             ship_id = sbs.get_ship_of_client(client_id)
@@ -132,24 +193,22 @@ shared manual_beams_version_task = None
             if ship_id != 0 and ship is not None:
                 ship.set_inventory_value("MANUAL_BEAMS_ON", not ship.get_inventory_value("MANUAL_BEAMS_ON", False))
             jump manual_weapons_minimize
-        gui_blank()
-        on gui_message(gui_button("weapons")):
-            _manual_system = sbs.SHPSYS.WEAPONS
-            jump manual_weapons_shoot
-        on gui_message(gui_button("engine")):
-            _manual_system = sbs.SHPSYS.ENGINES
-            jump manual_weapons_shoot
-        on gui_message(gui_button("sensors")):
-            _manual_system = sbs.SHPSYS.SENSORS
-            jump manual_weapons_shoot
-        gui_row("row-height: 2em;")
-        gui_text(f"targeting {name}")
-        gui_row()
-        
+        # The hole the square stands in. It draws nothing, so the two regions above show
+        # through; it is here so the target's name starts clear of them.
+        gui_blank(1, "col-width: 166px;")
+        # The called-shot panel owns the square in this state, so the tow is stated in
+        # the strip instead. It is never left completely unsaid.
+        gui_text(f"$text:targeting {name}{manual_tether_suffix(ship_id)};font:gui-1;")
 
+    with gui_rebuild(mb_bars):
+        manual_beams_bars(target_id, _hit)
 
-        
-        
+    with gui_rebuild(mb_labels):
+        manual_beams_labels(target_id, _armed, _hit)
+
+    # The bands ARE the buttons. Their click handler is attached in the helper, as a
+    # PYTHON callback on each band - see _mb_band_handler for why it cannot be an
+    # `on gui_click` block on a panel that rebuilds itself every three seconds.
 
     #
     # This ends execution of the task
@@ -158,39 +217,6 @@ shared manual_beams_version_task = None
     yield idle
 
 
-
-
-==== manual_weapons_shoot  =======
-    # Re-get ship ID incase switch ship
-    ship_id = sbs.get_ship_of_client(client_id)
-    ->END if ship_id == 0
-
-    critical = get_inventory_value(ship_id, "MANUAL_CRITICAL_HIT", False)
-    if _manual_system != latest_target:
-        set_inventory_value(ship_id, "MANUAL_SYSTEM", _manual_system)
-        set_inventory_value(ship_id, "MANUAL_CRITICAL_HIT", None)
-        if critical:
-            comms_broadcast(client_id, "Lost Critical hit, chance", "cyan")
-
-    latest_target = _manual_system
-
-    #
-    # If critical don't do it again
-    #
-    yield idle if critical
-
-    target_id = get_weapons_selection(ship_id)
-    jump manual_weapons_show if target_id==0
-    t = to_object(target_id)
-    jump manual_weapons_show if t is None
-
-    if random.randint(1,20) == 20:
-        set_inventory_value(ship_id, "MANUAL_SYSTEM", _manual_system)
-        set_inventory_value(ship_id, "MANUAL_CRITICAL_HIT", target_id)
-        comms_broadcast(client_id, f"Potential Critical hit {t.name}", "yellow")
-
-
-    yield idle
 
 
 //damage/object if is_hostile_to_players(DAMAGE_TARGET_ID)
@@ -214,7 +240,7 @@ shared manual_beams_version_task = None
     # Cause some damage
     #
     max_damage = t.data_set.get('system_max_damage', system)
-    cur = t.data_set.get('system_damage', system)
+    cur = t.data_set.get('system_damage', system) or 0
     if cur < 1:
         cur = 1
     up = cur*1.35
@@ -224,12 +250,58 @@ shared manual_beams_version_task = None
     #
 
     t.data_set.set('system_damage', up, system)
-    if cur > max_damage:
+    if max_damage is not None and cur > max_damage:
         comms_broadcast(DAMAGE_SOURCE_ID, f"{t.name} {system.name} Destroyed", "white")
-    else:
 
-        comms_broadcast(DAMAGE_SOURCE_ID, f"Critical hit {t.name} {system.name}", "red")
-
-
+    #
+    # The hit itself is NOT announced in the log any more - a line of text arriving in a
+    # scrollback is the easiest thing on the bridge to miss, and the gunner is looking at
+    # the square. The square says it instead: HIT across the target's art for two
+    # seconds, then back to the bars, which have just moved. The milestone above stays -
+    # "that system is gone" is worth a line; "you hit it" is not.
+    #
+    set_timer(DAMAGE_SOURCE_ID, "MANUAL_HIT", seconds=2, signal="manual_beams_hit_over")
+    shared manual_beams_version += 1
 
     ->END
+
+
+#
+# THE TETHER READOUT. Deliberately the LAST label in the file: labels fall through, so
+# the adjacency of two of them is an interface, and this one must not sit between the
+# panel's existing states. Nothing falls into it - manual_weapons_minimize jumps here -
+# and nothing falls out of it.
+#
+# It borrows the called-shot square rather than asking for screen of its own. The two
+# never want it at the same moment: the called-shot panel is up while the gunner is
+# working a target in beam range, and a tow is what the console is doing the rest of the
+# time. While the called-shot panel does own the square, the strip along the bottom still
+# names the tow (manual_tether_suffix, in manual_weapons_maximize).
+#
+====== manual_weapons_tether ======
+    ship_id = sbs.get_ship_of_client(client_id)
+    ship = to_object(ship_id)
+    yield fail if ship is None
+
+    with gui_rebuild(manual):
+        gui_row("row-height: 72px;")
+        cb = gui_checkbox("$text:Manual;state:True", "col-width: 120px;")
+        cb.value = ship.get_inventory_value("MANUAL_BEAMS_ON", False)
+        on gui_message(cb):
+            ship_id = sbs.get_ship_of_client(client_id)
+            ship = to_object(ship_id)
+            if ship_id != 0 and ship is not None:
+                ship.set_inventory_value("MANUAL_BEAMS_ON", not ship.get_inventory_value("MANUAL_BEAMS_ON", False))
+            jump manual_weapons_maximize
+        # The hole the square stands in, same as the maximized state - the two regions
+        # draw through it, and the text starts clear of them.
+        gui_blank(1, "col-width: 166px;")
+        gui_text(f"$text:grav-tether engaged;font:gui-1;color:#0ff;")
+
+    with gui_rebuild(mb_bars):
+        manual_tether_bars(ship_id)
+
+    with gui_rebuild(mb_labels):
+        manual_tether_labels(ship_id)
+
+    yield idle

@@ -34,7 +34,12 @@ shared surrender_color = "yellow"
 //comms/station/build
     comms_id = COMMS_ORIGIN.name
     + !0 "Back" //comms
+    # List the build buttons in the order the ASKING ship lists its own ordinance, so
+    # the menu matches that pilot's ship-data widget rather than inventing an order
+    # of its own (issue #693). The reference has to be the player, not the station -
+    # stations carry no torpedostart in shipData, so the engine has no order for them.
     torp_keys = get_inventory_value(COMMS_SELECTED_ID, "torpedo_production_keys")
+    torp_keys = docking_order_torpedo_keys(COMMS_ORIGIN_ID, torp_keys)
     for t in torp_keys:
         text = torp_get_attribute_value(t, "gui_text")
         + "Build {text}" station_build_weapon {"build_type": t, "comms_id": comms_id, "weapon_text": text}
@@ -57,12 +62,12 @@ shared surrender_color = "yellow"
     # station_build_times = get_build_times(station_id)
     torpedo_build_type = get_inventory_value(station_id, "build_type", 0)
 
-    s_max = int(get_data_set_value(COMMS_SELECTED_ID, "shield_max_val", 0))
-    s_cur = int(get_data_set_value(COMMS_SELECTED_ID, "shield_val", 0))
-    s_per = int(s_cur / s_max * 100)
-    a_max = int(get_data_set_value(COMMS_SELECTED_ID, "armorMax", 0))
-    a_cur = int(get_data_set_value(COMMS_SELECTED_ID, "armor", 0))
-    a_per = int(a_cur / a_max * 100)
+    s_max = int(get_data_set_value(COMMS_SELECTED_ID, "shield_max_val", 0) or 0)
+    s_cur = int(get_data_set_value(COMMS_SELECTED_ID, "shield_val", 0) or 0)
+    s_per = int(s_cur / s_max * 100) if s_max else 0
+    a_max = int(get_data_set_value(COMMS_SELECTED_ID, "armorMax", 0) or 0)
+    a_cur = int(get_data_set_value(COMMS_SELECTED_ID, "armor", 0) or 0)
+    a_per = int(a_cur / a_max * 100) if a_max else 0
 
     homing = get_data_set_value(COMMS_SELECTED_ID, "Homing_NUM", 0)
     nuke = get_data_set_value(COMMS_SELECTED_ID, "Nuke_NUM", 0)
@@ -73,6 +78,7 @@ shared surrender_color = "yellow"
     build_time = format_time_remaining(COMMS_SELECTED_ID, "build_time")
 
     torp_keys = get_inventory_value(station_id, "torpedo_production_keys")
+    torp_keys = docking_order_torpedo_keys(COMMS_ORIGIN_ID, torp_keys)
 
     stats = ""
     for t in torp_keys:

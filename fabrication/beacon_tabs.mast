@@ -26,6 +26,17 @@ default CONSOLE_SELECT = ""
 //gui/tab/fabricate
 --- fab_repaint
     gui_tab_back(CONSOLE_SELECT)
+    # RE-DECLARE THE WHOLE STRIP, not just the back tab. The page CONSUMES its tab
+    # declarations: maststorypage clears `console_tabs` and `__back_tab__` as soon as
+    # it has drawn the strip, so whatever a build does not declare is gone from the
+    # next one. //gui/normal_engi enables these two ONCE, when Engineering activates,
+    # which is enough for the first paint and nothing after it.
+    #
+    # It went unnoticed because this panel almost never repainted. Now it repaints on
+    # Build and once a second while a build runs, so the strip was rebuilt with only
+    # what this label declares and the buttons went missing. consoles/debug.mast has
+    # always done it this way (gui_tab_back then gui_tab_enable("brain,mast")).
+    gui_tab_enable("fabricate,cargo")
     gui_activate_console("fabricate")
     ship_id = sbs.get_ship_of_client(client_id)
     default fab_sel_key = None
@@ -127,8 +138,27 @@ default CONSOLE_SELECT = ""
                 signal_emit("beacon_build", {"ship_id": ship_id, "recipe": rk, "program": fab_prog})
             else:
                 signal_emit("fabricate_recipe", {"ship_id": ship_id, "key": rk})
+            # Repaint, or pressing Build does nothing visible. The page was built with
+            # fab_building False, so it is parked in the plain `await gui()` - not the
+            # 1-second self-tick branch that draws the countdown - and nothing here
+            # would ever wake it. The route ran INLINE inside signal_emit (emit_signal
+            # ticks it in context), so the timer is already set and this repaint sees
+            # the build.
+            fab_sel_hint = fab_box.get_selection_hint()
+            jump fab_repaint
     elif fab_sel is not None:
         """color:#888; justify:center; $text: need materials"""
+
+    # RIGHT (result): what the fabricator last produced, and where it went. The
+    # completion toast is a LOG line - it lands in the ambient strip and the Log tab,
+    # i.e. everywhere except the panel the engineer is watching - so on its own a
+    # finished build looked exactly like nothing happening. This is its durable twin:
+    # it holds until the next build starts, and it survives a repaint, a tab switch
+    # and a reconnect because it lives on the ship.
+    gui_section(style="area: 47, 92, 95, 100;")
+    fab_done = fabrication_last_built(ship_id)
+    if fab_done != "":
+        """color:#6f6; justify:center; $text: Built {fab_done} - now in Cargo"""
 
     on signal item_changed:
         fab_sel_hint = fab_box.get_selection_hint()
@@ -148,6 +178,8 @@ default CONSOLE_SELECT = ""
 //gui/tab/cargo
 --- cargo_repaint
     gui_tab_back(CONSOLE_SELECT)
+    # Same as fab_repaint: the strip is consumed on every build. See there.
+    gui_tab_enable("fabricate,cargo")
     gui_activate_console("cargo")
     ship_id = sbs.get_ship_of_client(client_id)
     default cargo_sel_cid = None
@@ -191,13 +223,17 @@ default CONSOLE_SELECT = ""
 
     # RIGHT (actions): beacon -> Deliver + Eject; item/material -> Eject
     gui_section(style="area: 47, 40, 95, 68;")
+    # Both act on the cargo INDEX, not on the beacon's (kind, monster, mode): two Sensor
+    # Beacons differing only in beacon_range are indistinguishable to such a match, and the
+    # workflow would deliver whichever came first. The list is rebuilt on item_changed, so
+    # the index a click carries is the one the row was painted with.
     if car_sel is not None and car_sel["ckind"] == "beacon":
-        car_dv = gui_button("$text:Deliver to Weapons;justify:center;", data={"bk": car_sel["kind"], "bm": car_sel["monster"], "bd": car_sel["mode"]})
+        car_dv = gui_button("$text:Deliver to Weapons;justify:center;", data={"bi": car_sel["cidx"]})
         on gui_message(car_dv):
-            signal_emit("beacon_deliver", {"ship_id": ship_id, "kind": bk, "monster": bm, "mode": bd})
-        car_ej = gui_button("$text:Eject;justify:center;", data={"ek": car_sel["kind"], "em": car_sel["monster"], "ed": car_sel["mode"]})
+            signal_emit("beacon_deliver", {"ship_id": ship_id, "bidx": bi})
+        car_ej = gui_button("$text:Eject;justify:center;", data={"bi": car_sel["cidx"]})
         on gui_message(car_ej):
-            signal_emit("beacon_eject", {"ship_id": ship_id, "kind": ek, "monster": em, "mode": ed})
+            signal_emit("beacon_eject", {"ship_id": ship_id, "bidx": bi})
     elif car_sel is not None:
         car_ejg = gui_button("$text:Eject;justify:center;", data={"gk": car_sel["key"]})
         on gui_message(car_ejg):

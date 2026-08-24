@@ -68,7 +68,10 @@ def _declare_recipe_vocabulary():
         "inputs": counted(hint="salvage x5, bio_sample x1"),
         "time": integer(hint="build seconds"),
         "build at": enum("engineering", "science", "weapons", "comms", "helm", open=True),
-        "program": kv(hint="kind=bio, range=medium"),
+        # Program keys can end up bound as MAST variables (the Properties grid binds
+        # var= names through set_variable), so keep them off MAST's globals table -
+        # `beacon_range`, never `range`. See the ns-amd-var-shadows-builtin lint rule.
+        "program": kv(hint="kind=bio, beacon_range=medium"),
         # Blocks, not scalars: a {label: 'gui_control_expr'} property grid and a
         # {var: value} seed map. Their INNER names belong to the recipe, so they are
         # declared as text and the linter does not look inside them.
@@ -218,18 +221,17 @@ def recipe_title():
 def cargo_list(ship_id):
     """A general cargo manifest for the Cargo tab: built beacons + held registry items + held
     non-beacon recipe outputs (materials). Each entry: {ckind, name, count, ...}. Beacons carry
-    their program (kind/monster/mode) and a cidx into beacon_built; items/materials carry a key.
+    their program (kind/monster/mode/beacon_range) and a cidx into beacon_built; items/materials
+    carry a key. Deliver and Eject act on the cidx, not on the program values -- two Sensor
+    Beacons differing only in range would otherwise be indistinguishable to a match.
     So the Cargo tab isn't beacon-only -- it lists everything the ship is carrying."""
     out = []
     # built beacons (one row each, so a single one can be delivered / ejected)
     built = get_inventory_value(ship_id, "beacon_built", []) or []
     idx = 0
     for b in built:
-        # A Sensor Beacon carries no monster/mode; name it plainly rather than "? / ?".
-        if b.get("kind") == "sensor":
-            b_name = "Sensor Beacon"
-        else:
-            b_name = f"Beacon: {b.get('mode', '?')} / {b.get('monster', '?')}"
+        # A Sensor Beacon carries no monster/mode; name it by its range rather than "? / ?".
+        b_name = fabrication_beacon_name(b)
         out.append({
             "ckind": "beacon", "cidx": idx, "count": 1, "cid": f"b{idx}",
             "name": b_name,
@@ -274,3 +276,44 @@ def cargo_row(item):
 def cargo_title():
     gui_row("row-height: 1.1em; padding:8px; background:#1578;")
     gui_text("$text:Cargo;justify:center;")
+
+
+# --- "what just came out of the fabricator" ---------------------------------
+#
+# The Fabricate panel's only feedback used to be the countdown, and even that was
+# unreachable (the page never repainted after Build). When a build FINISHED the panel
+# said nothing at all - the sole indication was an overlay_toast, which is a log line
+# now: it lands in the ambient strip and the Log tab, i.e. everywhere except the panel
+# the engineer is looking at. So a build looked like nothing happened, twice over.
+#
+# A toast needs a durable twin. This is the twin: the completion routes stamp what came
+# out, the panel shows it until the next build starts, and it survives a repaint, a tab
+# switch and a reconnect because it lives on the ship.
+
+def fabrication_last_built_set(ship_id, name):
+    """Record what the fabricator just produced (None clears it)."""
+    if name is None:
+        set_inventory_value(ship_id, "fab_last_built", None)
+        return
+    # Braces out. MAST re-runs every assigned STRING through f-string formatting, so a
+    # `{` in a name the panel assigns would be a SyntaxError reported against the
+    # panel's line rather than against whatever produced the name.
+    set_inventory_value(ship_id, "fab_last_built",
+                        str(name).replace("{", "(").replace("}", ")"))
+
+
+def fabrication_last_built(ship_id):
+    """What the fabricator last produced, or "" if nothing since the last build."""
+    return get_inventory_value(ship_id, "fab_last_built", None) or ""
+
+
+def fabrication_beacon_name(entry):
+    """Display name for a built beacon - the same naming the Cargo tab uses.
+
+    Shared so the "Built: X" line and the cargo row cannot drift apart; they are the
+    two halves of one claim ("it is done, and it is over there").
+    """
+    if entry.get("kind") == "sensor":
+        return ("Sensor Beacon (Long Range)" if entry.get("beacon_range") == "long"
+                else "Sensor Beacon")
+    return f"Beacon: {entry.get('mode', '?')} / {entry.get('monster', '?')}"

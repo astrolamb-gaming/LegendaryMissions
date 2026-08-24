@@ -1,0 +1,233 @@
+# Director - the entry screen. Say what this console IS.
+#
+# ALWAYS SHOWN, pin or no pin. The old gate skipped itself entirely when DIRECTOR.pin was empty,
+# which left nowhere to declare a mode - and mode is the first thing a streamer needs to say,
+# because it decides whether this client is a control console or a screen the show goes out on.
+#
+# The three modes and why they exist are in director_modes.py. Short version: the Director is a
+# streaming tool, so you open extra clients and declare each one program or preview, rather than
+# the Director reaching out and taking over a mainscreen or somebody's crew seat.
+#
+# THERE IS NOTHING TO TYPE. The mode names the screen - PROG01, PRE01, DIR01 - so the name field
+# went: it only ever held what the radio above it already implied, and a streamer opening four
+# windows had to type in all four. Pick a mode, press Start.
+
+# NOT `shared`. This is one console deciding what IT is, and `set_value_keep_scope` writes a
+# shared variable back to SHARED - so a radio bound to a shared name is ONE radio for every
+# client, and a second streamer opening the entry screen would move the first one's selection
+# under their hand. `director_entry` seeds it per client before the radio is built, which is
+# all the declaration was doing.
+
+# `pre_game: true` is how this console asks the picker to let it be set up BEFORE the mission
+# starts - see the Ready handler in consoles/common_console_select.mast. It is read off the
+# LABEL, so that file names no addon; a console that does not declare it is unchanged.
+#
+# THE METADATA BLOCK GOES ABOVE THE DESCRIPTION LINE, and that is not a style choice. The
+# `metadata:` line and its closing fence sit at column 0, so putting them after ANY indented
+# body line - the `"` description included - is an indentation drop mid-label and fails to
+# compile with "Bad indentation". Measured on `@console`, `@map` and a plain `==` label alike;
+# MAST_CLAUDE.md's `@map` example has them the other way round and does not compile. A story
+# that does not compile schedules NO task at all, so this is a whole-mission failure, not a
+# local one.
+@console/director !0 ^94 "Director" if DIRECTOR_enabled
+metadata: ``` yaml
+pre_game: true
+```
+    " Stream director - pick program, preview or the control console.
+    jump director_entry
+
+//gui/tab/director
+    jump cv_ui
+
+=== director_entry
+    # Carried over from a rejected Start. `default`, so a first visit has none and a repaint
+    # coming back from director_entry_start keeps the one it just set.
+    default cv_entry_error = ""
+    # A camera first, so this client is never sitting on somebody's bridge while it decides.
+    director_cam_ensure(client_id)
+
+    # ALREADY DECLARED, AND SENT BACK HERE BY THE START OF THE GAME? Go straight to the mode.
+    #
+    # A console set up before the mission starts is rerouted through `game_started_console`
+    # when the server presses Start, and that walks it into its console the ordinary way -
+    # `jump(console.label)`, which lands right here. Without this, a screen the streamer had
+    # already declared as PROG01 comes back to the pin screen, and with four windows open
+    # somebody has to walk round and press Start in all of them. Setting up early would buy
+    # nothing.
+    #
+    # ONE-SHOT, and that is the whole design - see director_mode_resume_take. The picker path
+    # and the start reroute arrive by the same jump and are otherwise identical, so the flag is
+    # armed when a mode is committed and SPENT here. The start reroute spends it; an operator
+    # who later re-picks Director off the console list finds it spent and gets this screen,
+    # which is the only way to change a mode.
+    if director_mode_resume_take(client_id):
+        jump director_entry_resume
+    cv_entry_mode = director_mode_label(director_mode_of(client_id))
+    cv_name = director_cam_default_name(client_id, director_mode_for(cv_entry_mode))
+    pin = ""
+
+    # THE GEOMETRY IS IN director_layout.py, and this page is why that module's warning is
+    # worth reading twice. It shipped with a hand-written `area:` and hand-written `em` rows,
+    # nothing measured it, and it rendered with the radio labels wrapped mid-word, the help
+    # text overlapping the pin row and the input drawn on top of the button. The engine does
+    # not clip: a row declared one size and rendered another spills into whatever is under it.
+    gui_section(director_area("entry"))
+
+    # EVERY ROW IS ONE LINE PLUS AN EXPLICIT PAD, and that is the correction the first pass
+    # needed. Making a row taller to stop things overlapping does not give a control room - a
+    # widget FILLS its cell, so a taller row is a taller BUTTON, and the fix left 62px slabs
+    # behind. `row-height` is for the line of text; `padding:` is for the air around it, and it
+    # comes out of the row rather than adding to it (layout.py shrinks the row's area by it).
+    #
+    # The pad is mostly on the BOTTOM - that is the gap to the next row, which is the spacing a
+    # reader actually sees. The numbers here are the same ones _ROWS_ENTRY declares.
+    gui_row("row-height: 1em+12px; font: gui-4; padding: 0,0,0,12px;")
+    gui_text("$text:`Director`;font:gui-4;color:#8cf;justify:center;")
+
+    gui_row("row-height: 1em+6px; font: gui-2; padding: 0,0,0,6px;")
+    gui_text("$text:`This console is a`;font:gui-2;color:#9ab;")
+
+    # THE RADIO IS THE ONE THAT CANNOT BE MEASURED, so it is the one that needs both numbers.
+    # `RadioButtonGroup` inherits the base `Column.measure`, which returns None - so it declines,
+    # falls back to FLEX and fills whatever it is given. An explicit line height is what stops
+    # that, and the padding is what keeps the buttons from being as tall as the row.
+    #
+    # And NO gui_blank() beside it. The group is ONE content item whose own layout splits its
+    # width across the buttons, so a second flex column starved all three labels at once - that
+    # is what broke "Director" into "Direct/r". Alone on the row it sizes them to their text.
+    gui_row("row-height: 1em+24px; font: gui-3; padding: 0,8px,0,16px;")
+    mode_rb = gui_radio(director_mode_list(), var="cv_entry_mode")
+
+    gui_row("row-height: 1em+12px; font: gui-3; padding: 0,0,0,12px;")
+    cv_entry_name_w = gui_text("$text:" + gui_text_escape("This screen will be called " + cv_name) + ";font:gui-3;color:#8cf;")
+    on gui_message(mode_rb):
+        # THE NAME FOLLOWS THE MODE, and says so before you commit - `PROG01` becomes `PRE01`
+        # as the radio moves. Read the WIDGET rather than cv_entry_mode: the var write and this
+        # block are both on the message path and nothing promises which lands first.
+        cv_name = director_cam_default_name(client_id, director_mode_for(mode_rb.value))
+        cv_entry_name_w.update("text:" + gui_text_escape("This screen will be called " + cv_name) + ";font:gui-3;color:#8cf;")
+
+    # `row-height: content`, because this sentence WRAPS and how many lines it wraps to depends
+    # on the width - declared as one line it put its second line through the pin row. `content`
+    # measures the wrapped height at the row's real width and gets the padding added back to it,
+    # and _ROWS_ENTRY reserves two lines so the section has the space to give.
+    #
+    # This card is ~770px wide at 1280, inside the range the measured wrap is trustworthy in - it
+    # matches the engine at 600px and up, and diverges below ~300px.
+    gui_row("row-height: content; font: gui-1; padding: 0,0,0,14px;")
+    gui_text("$text:`Program is what the stream shows. Preview is the shot before it goes out. Director drives them.`;font:gui-1;color:#9ab;")
+
+    # PIN AND START ARE ONE ACTION - type the pin, press Start - so they are one row. The row is
+    # one gui-2 line plus its pad, which makes the input and the button one line tall with air
+    # around them rather than the two slabs they were.
+    #
+    # The pin half is conditional: set DIRECTOR.pin to "" and this screen still appears, because
+    # it is where the mode is chosen and not just a lock. Building it INSIDE the row means a
+    # pinless console gets `[ Start ]` alone rather than a gap where the box would have been.
+    gui_row("row-height: 1em+16px; font: gui-2; padding: 0,4px,0,12px;")
+    if DIRECTOR.get("pin"):
+        gui_text("$text:`Pin`;font:gui-2;color:#9ab;", director_col("content"))
+        gui_input("""desc: Enter pin;password:True;""", director_col("220px"), var="pin")
+    startb = gui_button("Start", director_col("160px"))
+    # THIS blank IS wanted, where the radio's was not: it takes the leftover width so the button
+    # keeps its 160px instead of stretching across the card.
+    gui_blank()
+    on gui_message(startb):
+        jump director_entry_start
+
+    gui_row("row-height: 1em; font: gui-2;")
+    gui_text("$text:" + gui_text_escape(cv_entry_error) + ";font:gui-2;color:#f88;")
+    # Consumed: the message belongs to the attempt that caused it, so a later repaint of this
+    # screen comes up clean rather than still accusing you of the last wrong pin.
+    cv_entry_error = ""
+
+    await gui():
+        + "cancel":
+            # BACKING OUT UNDECLARES THIS CONSOLE. Without it the next visit would find a mode
+            # still stored and could skip the screen just cancelled out of.
+            director_mode_clear(client_id)
+            # ...AND UNTICKS READY, before the game starts. `console_ready` is a task variable
+            # of THIS task - the same GUI task that ran the picker - so the picker's own
+            # clear-and-return label can still reach it from here. After the start it is a dead
+            # flag (game_started_console read it once, at Start) and the picker shows a Ready
+            # BUTTON instead of the checkbox, so there is nothing to untick.
+            jump select_console_clear_ready if not GAME_STARTED
+            jump select_console
+
+# Commit the name and mode, then go where the mode says. Separate label because the pin check
+# has to happen before anything is stored - a wrong pin should change nothing.
+=== director_entry_start
+    if DIRECTOR.get("pin") and pin != DIRECTOR.get("pin"):
+        # JUMP BACK AND REBUILD - never `await gui()` here.
+        #
+        # `await gui()` swaps the PENDING layout in (StoryPage.set_button_layout ->
+        # swap_layout), and the previous swap left pending as a fresh EMPTY section. So a label
+        # that builds nothing and then awaits hands the client a blank page: a wrong pin went
+        # to a black screen with no way back. Repainting the whole screen also clears the pin
+        # box, which is what you want after a bad attempt.
+        cv_entry_error = "wrong pin"
+        jump director_entry
+    # NAME IT FROM THE MODE, and store the mode FIRST so a later re-entry derives the same
+    # name from the same answer. The name goes to SCREEN_NAME, which is the SCREEN's; the
+    # person at the console keeps CREW_NAME, which is theirs. They used to share one key, so
+    # opening a Director console renamed whoever was sitting there.
+    cv_entry_chosen = director_mode_set(client_id, director_mode_for(cv_entry_mode))
+    director_cam_name(client_id, director_cam_default_name(client_id, cv_entry_chosen))
+    # ARM THE RESUME. Spent by the next entry to this screen, which - for a console set up
+    # before the mission - is the start-of-game reroute. See director_entry.
+    director_mode_resume_arm(client_id)
+    jump director_entry_resume
+
+
+# Where a declared mode actually sends this console. TWO CALLERS, which is why it is a label
+# and not three lines repeated: a fresh Start, and the start-of-game reroute skipping the pin.
+=== director_entry_resume
+    if director_mode_of(client_id) == "program":
+        jump cv_screen_program
+    if director_mode_of(client_id) == "preview":
+        jump cv_screen_preview
+    jump cv_ui
+
+
+# ---- a screen, waiting for the show --------------------------------------------------------
+#
+# Both of these are holding pages. The player reroutes the client away to whatever the Director
+# sends, and back here when there is nothing - so what they mostly do is say which screen this
+# is, so a streamer setting up four windows can tell them apart.
+#
+# THE FIRST LINE IS THE CLEAR. `director_screen_enter` is called by every one of the four
+# reroute targets, and this is two of them: a screen arriving here from a live shot is arriving
+# with a lower third and a running camera leg still on it, and nothing else would take them
+# down. See director_play.py - one door is cheaper to keep true than six.
+
+=== cv_screen_program
+    director_screen_enter(client_id)
+    director_screen_park(client_id)
+    set_inventory_value(client_id, "CONSOLE_TYPE", "program")
+    for cv_name_iter in gui_get_console_types():
+        remove_role(client_id, cv_name_iter)
+    add_role(client_id, "console, program")
+    gui_section("area: 0, 0, 100, 100;")
+    gui_row("row-height: 2.0em; font: gui-4;")
+    gui_text("$text:" + gui_text_escape(director_cam_name(client_id) + " - PROGRAM") + ";font:gui-4;color:#8cf;justify:center;")
+    gui_row("row-height: 1.4em; font: gui-2;")
+    gui_text("$text:`waiting for the director`;font:gui-2;color:#9ab;justify:center;")
+    gui_row()
+    gui_blank()
+    await gui()
+
+=== cv_screen_preview
+    director_screen_enter(client_id)
+    director_screen_park(client_id)
+    set_inventory_value(client_id, "CONSOLE_TYPE", "preview")
+    for cv_name_iter in gui_get_console_types():
+        remove_role(client_id, cv_name_iter)
+    add_role(client_id, "console, preview")
+    gui_section("area: 0, 0, 100, 100;")
+    gui_row("row-height: 2.0em; font: gui-4;")
+    gui_text("$text:" + gui_text_escape(director_cam_name(client_id) + " - PREVIEW") + ";font:gui-4;color:#8f8;justify:center;")
+    gui_row("row-height: 1.4em; font: gui-2;")
+    gui_text("$text:`nothing staged`;font:gui-2;color:#9ab;justify:center;")
+    gui_row()
+    gui_blank()
+    await gui()
