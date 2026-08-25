@@ -13,6 +13,9 @@ default shared GAMEMASTER_CONSOLE_ENABLED = GAMEMASTER_CONSOLE.get("enable", Tru
 default shared GAMEMASTER_CONSOLE_PIN = GAMEMASTER_CONSOLE.get("pin", None)
 default shared GAMEMASTER_CONSOLE_BETA = GAMEMASTER_CONSOLE.get("beta", False)
 default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_size", 45)
+# Remember the last open submenu per main menu so tab switches restore the same pane.
+default GM_SIDEBAR_SUBMENU_PANELS = {}
+default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
 
 @console/gamemaster !0 ^1 "Game Master" if GAMEMASTER_CONSOLE_ENABLED
 " Affect the overall battle
@@ -138,13 +141,6 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
     content_panels = list()
 
     # This is a dictionary that lets us figure out which panel to present based on which button is pressed.
-    button_panel_dict = {}
-
-    # A dictionary with the key being a content panel to show, and the value being a list of buttons that are presented on that panel. This allows for finding which sub menu to open when opening a different menu.
-    content_panel_buttons = {}
-
-    # This is the currently presented panel, so we know which one to hide when a new panel is presented.
-    cur_panel = None
     menu_panel = None
 
     # gss = gui_sub_section(f"background-color: #00043d5d;")
@@ -182,7 +178,11 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
             # Build the submenu buttons
             buttons = list()
             sub_menu_sections = list()
-            for sub in sorted_subs:
+            selected_submenu_index = GM_SIDEBAR_SELECTED_SUBMENU_INDEX.get(m_type, 0)
+            if selected_submenu_index < 0 or selected_submenu_index >= len(sorted_subs):
+                selected_submenu_index = 0
+
+            for sub_index, sub in enumerate(sorted_subs):
                 icon = sub.get_inventory_value("icon_index")
                 if icon is None:
                     icon = 0
@@ -190,49 +190,30 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
                 if icon_color is None:
                     icon_color = "#404ad8"
                 if isinstance(icon, int) or icon.isdigit():
-                    button = gui_icon_button(f"icon_index: {icon};color: {icon_color};", "color: #01234567;")
+                    button = gui_icon_button(f"icon_index: {icon};color: {icon_color};", "color: #01234567;", data={"menu_type": m_type, "submenu_index": sub_index}, on_press="gm_sidebar_select_submenu")
                 else:
-                    button = gui_button(f"$text: {icon}; color: {icon_color};"," col-width: content;")
+                    button = gui_button(f"$text: {icon}; color: {icon_color};", " col-width: content;", data={"menu_type": m_type, "submenu_index": sub_index}, on_press="gm_sidebar_select_submenu")
                 buttons.append(button)
 
-            content_panel_buttons[m] = buttons
-            
-            
-            i = 0
-            for sub in sorted_subs:
+            for sub_index, sub in enumerate(sorted_subs):
                 # Now we build the section for the actual contents.
                 sub_section_row = gui_row()
                 content_section = gui_sub_section()
                 with content_section:
                     await gui_sub_task_schedule(sub)
-                if cur_panel is None:
-                    cur_panel = sub_section_row
+                if sub_index == selected_submenu_index:
+                    gui_show(sub_section_row)
                 else:
                     gui_hide(sub_section_row)
                 sub_menu_sections.append(sub_section_row)
-                button_panel_dict[buttons[i]] = sub_section_row
-                i+=1
 
-            for button in buttons:
-                on gui_message(button):
-                    # Here we will need to hide/show applicable sub sections
-                    if __ITEM__ is not None:
-                        panel = button_panel_dict.get(__ITEM__)
-                        if panel is not None:
-                            gui_hide(cur_panel)
-                            gui_show(panel)
-                            cur_panel = panel
-                            gui_represent(contents)
+            GM_SIDEBAR_SUBMENU_PANELS[m_type] = sub_menu_sections
+            GM_SIDEBAR_SELECTED_SUBMENU_INDEX[m_type] = selected_submenu_index
         if menu_panel is not None:
             gss_row.show(False)
         else:
             menu_panel = gss_row
         content_panels.append(gss_row)
-
-            
-        gss = gui_sub_section()
-        with gss:
-            gui_row()
 
     # menu.cur is the NOT the index of the menu
     on change main_menu_list_box.value:
@@ -242,8 +223,8 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
             p.show(True)
             menu_panel.show(False)
             menu_panel = p
-        gui_represent(contents)
 
+        gui_represent(contents)
 
 --- gm_test_restart_button
     with gui_section("area:80,90,95,95;"):
@@ -272,6 +253,23 @@ default shared GAMEMASTER_CONSOLE_ICON_SIZE = GAMEMASTER_CONSOLE.get("menu_icon_
 --- gm_finalize_gui
     # Can add temp code here for testing purposes
     await gui()
+
+--- gm_sidebar_select_submenu
+    default menu_type = ""
+    default submenu_index = 0
+    if __ITEM__ is not None:
+        menu_type = __ITEM__.data.get("menu_type", "")
+        submenu_index = __ITEM__.data.get("submenu_index", 0)
+
+    panels = GM_SIDEBAR_SUBMENU_PANELS.get(menu_type)
+    if panels is not None and len(panels) > 0:
+        current_index = GM_SIDEBAR_SELECTED_SUBMENU_INDEX.get(menu_type, 0)
+        if current_index >= 0 and current_index < len(panels):
+            gui_hide(panels[current_index])
+        if submenu_index >= 0 and submenu_index < len(panels):
+            gui_show(panels[submenu_index])
+            GM_SIDEBAR_SELECTED_SUBMENU_INDEX[menu_type] = submenu_index
+    ->END
 
 
 --- gui_setup
@@ -1199,12 +1197,18 @@ priority: 99
     with sec:
         gui_row("row-height: 2em; background: #1234566b;")
         timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
-        test_gui_text_escape = gui_text_escape("{format_time(timer)}")
+        if timer is None:
+            print("Counter is NONE")
+        # test_gui_text_escape = gui_text_escape("{format_time(timer)}")
+        elapsed_time_format = "hh:mm:ss"
+        test_gui_text_escape = format_counter_elapsed_seconds(0, "Mission_Elapsed_Time", elapsed_time_format)
         elapsed_time = gui_text("$text:Mission Elapsed Time:; justify: left;")
         t = gui_text(f"$text:{test_gui_text_escape};justify: right;")
         on change get_counter_elapsed_seconds(0, "Mission_Elapsed_Time"):
+            print("timer updated")
             timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
-            test_gui_text_escape = gui_text_escape("{format_time(timer)}")
+            # test_gui_text_escape = gui_text_escape("{format_time(timer)}")
+            test_gui_text_escape = format_counter_elapsed_seconds(0, "Mission_Elapsed_Time", elapsed_time_format)
             t.update(f"$text:{test_gui_text_escape};justify: right;")
         gui_row("row-height: 2em;")
         time_remaining_sub_section = gui_sub_section()
