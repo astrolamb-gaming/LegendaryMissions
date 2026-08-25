@@ -22,10 +22,20 @@ priority: 20 # Smaller number is higher priority
         #     gui_text("$text:Origins;justify:center;")
         origins_text = gm_spawn_type_button("$text:Origins;justify:center;", "background: #012223;")
         origins_row = gui_row("row-height: min-content;")
+        selected_style = "click_background: #123123;click_text:; background: #213213;"
+        unselected_style = "click_background: #213213;click_text:; background: #123123;"
+        selected_list = list()
         with gui_sub_section("row-height: 1.5em;"):
             with gui_grid(3):
                 for o in origins:
-                    gui_text(f"$text:{o};","click_background: #5555;click_text:;")
+                    spawn_filter = gui_text(f"$text:{o};",unselected_style)
+                    spawn_filter.data = {"origin":o}
+                    on gui_message(spawn_filter):
+                        data = __ITEM__.data
+                        origin = data.get("origin")
+                        print(origin)
+                        # if __ITEM__ in selected_lis
+                        
         
         origins_visible = True
         # on gui_click(origins_text):
