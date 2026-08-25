@@ -163,10 +163,13 @@ def format_elapsed_mission_time():
     seconds = str(time % 60).zfill(2)
     return f"{minutes}:{seconds}"
 
+# from math import round, divmod
 def format_time(seconds):
     """
     Format seconds into hh:mm:ss format
     """
+    if seconds is None:
+        return "00:00:00"
     seconds = round(seconds)
     minutes, sec = divmod(seconds, 60) # Get total minutes and remaining seconds
     hours, minutes = divmod(minutes, 60) # Get total hours and remaining
