@@ -1,3 +1,7 @@
+//gui/normal_gamemaster
+    # This shoudn't actually do anything. It's mostly here to prevent `gm_menu_spawn` from running immediately on startup without being attached to a gui.
+    ->END
+
 === gm_menu_spawn
 metadata: ``` yaml
 type: gm_menu/spawn
@@ -21,7 +25,7 @@ priority: 20 # Smaller number is higher priority
         with gui_sub_section("row-height: 1.5em;"):
             with gui_grid(3):
                 for o in origins:
-                    gm_spawn_type_button(f"$text:{o}")
+                    gui_text(f"$text:{o};","click_background: #5555;click_text:;")
         
         origins_visible = True
         # on gui_click(origins_text):
