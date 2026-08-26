@@ -1204,8 +1204,7 @@ priority: 99
         test_gui_text_escape = format_counter_elapsed_seconds(0, "Mission_Elapsed_Time", elapsed_time_format)
         elapsed_time = gui_text("$text:Mission Elapsed Time:; justify: left;")
         t = gui_text(f"$text:{test_gui_text_escape};justify: right;")
-        on change get_counter_elapsed_seconds(0, "Mission_Elapsed_Time"):
-            print("timer updated")
+        on change int(get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")):
             timer = get_counter_elapsed_seconds(0, "Mission_Elapsed_Time")
             # test_gui_text_escape = gui_text_escape("{format_time(timer)}")
             test_gui_text_escape = format_counter_elapsed_seconds(0, "Mission_Elapsed_Time", elapsed_time_format)

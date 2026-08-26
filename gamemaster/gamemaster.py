@@ -1,3 +1,4 @@
+from sbs_utils.procedural.style import apply_control_styles
 from sbs_utils.agent import Agent
 from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
 from sbs_utils.procedural.gui.message import gui_message
@@ -318,6 +319,13 @@ def filter_ship_data_generically(text):
             results.append(ship)
 
     return results
+
+def layout_item_update_style(item, style):
+    """
+    Update the style of a layout item.
+    """
+    apply_control_styles(".text", style, item, FrameContext.task)
+    item.mark_layout_dirty()
 
 def gm_ship_spawn_select_template(item):
     gui_row("padding:13px;")
