@@ -12,6 +12,19 @@
 #
 # The original Peacetime map is untouched and still selectable; this is a new @map.
 
+# Presentation pickers (map options). These are declared HERE, not hardcoded into the
+# server console, so a mission gets a control because its map asked for one - a mission
+# with no music banks, no crew rosters or no theaters shows nothing.
+#
+# Each seed reads the SHARED value first and the setting second, so this `default` cannot
+# overwrite a choice a profile already made with the fallback.
+default shared MUSIC_SELECT = music_selected_name()
+default shared MUSIC_LIST = music_name_list()
+default shared CREW_SELECT = crew_selected_name()
+default shared CREW_LIST = crew_name_list()
+default shared THEATER = theater_selected_name()
+default shared THEATER_LIST = theater_name_list()
+
 @map/peacetime_remastered "Peacetime Remastered"
 " A quiet border patrol shift. Work the quest board: run down the Florbin
 " kidnapping, qualify the gunnery crew, clear hazards, and police the lanes.
@@ -21,6 +34,9 @@ Properties:
   Main:
     Player Ships: 'gui_int_slider("$text:int;low: 1.0;high:8.0;", var= "PLAYER_COUNT")'
     Difficulty: 'gui_int_slider("$text:int;low: 1.0;high:11.0;", var= "DIFFICULTY")'
+    Music: 'gui_drop_down("$text: {MUSIC_SELECT};list: {MUSIC_LIST}", var="MUSIC_SELECT")'
+    Crew: 'gui_drop_down("$text: {CREW_SELECT};list: {CREW_LIST}", var="CREW_SELECT")'
+    Theater: 'gui_drop_down("$text: {THEATER};list: {THEATER_LIST}", var="THEATER")'
   Map:
     Terrain: 'gui_drop_down("$text: {TERRAIN_SELECT};list: none, few, some, lots, max",var="TERRAIN_SELECT")'
     Lethal Terrain: 'gui_drop_down("$text: {LETHAL_SELECT};list: none, few, some, lots, max", var="LETHAL_SELECT")'
@@ -236,7 +252,16 @@ Defaults:
     shared PR_JOB_COUNTS = {"drone": drone_n, "rock": rock_n, "traffic": traffic_n, "survey": survey_n, "probe": probe_n, "herd": herd_n, "salvage": salvage_n, "picket": picket_n}
     shared PR_LANDMARKS = landmarks_from_section(amd_section(PR_DOC, "landmarks"))
     # The jobs that spawn targets on accept, checked each dispatch tick.
-    shared PR_JOB_KEYS = ["job_gunnery", "job_rocks", "job_customs", "job_survey", "job_poacher", "job_mercy", "job_sensor_net", "job_probes", "job_herd", "job_ravener", "job_barge", "job_salvage", "job_lifepod", "job_relay", "job_picket", "job_ghost", "job_sweep", "job_cache", "job_herd_arc"]
+    # HOT FIX 2026-08-27: "job_picket" is OUT of this list. It is the only Peacetime
+    # job built on turrets, and turrets are off with extra ship data
+    # (LM_TURRETS_ENABLED in ../turrets/turrets.py). Dropped from the KEYS rather
+    # than deleted: the AMD goal, the spawner case, pr_picket_watch and the
+    # //shared/signal/lm_turret_deployed route all stay exactly as written, and
+    # none of them can run because the job is never granted, so nothing tows a
+    # crate that would never unfold. Put the key back to restore the job.
+    # (job_ravener and job_herd are NOT affected - grazers and raveners ride stock
+    # hulls, not extra ship data.)
+    shared PR_JOB_KEYS = ["job_gunnery", "job_rocks", "job_customs", "job_survey", "job_poacher", "job_mercy", "job_sensor_net", "job_probes", "job_herd", "job_ravener", "job_barge", "job_salvage", "job_lifepod", "job_relay", "job_ghost", "job_sweep", "job_cache", "job_herd_arc"]
 
     # The job board is the jobs section of PR_DOC (parsed above). Grant it PER PLAYER SHIP so
     # credit rewards pay to the side (a Scope: shared quest gets no credit). Anomaly Survey uses
@@ -374,7 +399,9 @@ Defaults:
             # Scatter idle salvage hulks + a stationary Refinery Platform as the drop-off; the
             # crew tows each hulk to the refinery. pr_salvage_watch credits each delivery.
             comms_info_card(all_roles("console, comms"), "Salvage hulks are cluttering the lane. Grav-tether each one and tow it to the Refinery Platform.", title="Salvage Order", color="#0cf", notify=True)
-            npc_spawn(-18000, 0, -6000, "Refinery Platform", "tsn, station, refinery", "starbase_command", "behav_station")
+            # ART ONLY - ART_KEYS, no-op unless set. Side/roles unchanged.
+            refinery_hull = ship_data_art_key_for("starbase_command")
+            npc_spawn(-18000, 0, -6000, "Refinery Platform", "tsn, station, refinery", refinery_hull, "behav_station")
             for v in scatter.box(PR_JOB_COUNTS.get("salvage", 3), -9000, 0, -12000, 3000, 400, 3000, centered=True):
                 npc_spawn(v.x, v.y, v.z, "Salvage Hulk", "civ, salvage_hulk, claimable", "cargo_ship", "behav_npcship")
             task_schedule(pr_salvage_watch)

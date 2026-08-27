@@ -1,10 +1,9 @@
 
 import copy
-import sbs
 from sbs_utils.procedural.query import to_object_list
 from sbs_utils.procedural.roles import role
 from sbs_utils.procedural.comms import comms_message
-from sbs_utils.procedural.gui.overlay import overlay_lower_third
+from sbs_utils.procedural.gui.overlay import overlay_lower_third_portrait
 from sbs_utils.procedural.announce import announce_headline
 from sbs_utils.procedural.amd_doc import amd_fill
 
@@ -18,12 +17,20 @@ def send_general_message(nName, textLine, face, srcID):
     third draws over the live view instead of interrupting it, and carries the
     speaker's face. The comms_message below is unchanged - it is where a player
     reads the full line back, so nothing is lost if a card is missed."""
-    # The host/server screen has no "mainscreen" role, so it keeps the dialog.
-    sbs.send_story_dialog(0, nName, textLine, face, "#444")
-
-    overlay_lower_third(announce_headline(nName, 40),
-                        announce_headline(textLine, 90),
-                        to=role("mainscreen") & role("console"), seconds=10)
+    # The host/server window is a main screen like any other now - it holds the
+    # `console, mainscreen` roles, so the lower third below reaches it. It used to get a
+    # send_story_dialog here instead, because add_role on client 0 was a silent no-op and
+    # the overlay audience could never include it. Once that was fixed the host got BOTH,
+    # stacked, on every beat.
+    # The PORTRAIT variant, so the strip actually carries the speaker's face - which the
+    # docstring above has always promised and the faceless `overlay_lower_third` never
+    # delivered; `face` only ever reached the comms_message below. It matters more now
+    # that the host's send_story_dialog is gone, because that dialog was the one place a
+    # face was shown on a main screen at all.
+    overlay_lower_third_portrait(announce_headline(nName, 40),
+                                 announce_headline(textLine, 90),
+                                 face=face,
+                                 to=role("mainscreen") & role("console"), seconds=10)
 
     # send it to all comms players as well
     my_players = to_object_list(role("__player__"))

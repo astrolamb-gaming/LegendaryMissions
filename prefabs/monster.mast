@@ -13,12 +13,19 @@ import prefab_helpers.py
 # library then read BACK, so the same hulls arrived twice.
 #
 # `shared` guarantees a single registration across all clients.
-shared _monster_ship_data = ship_data_add_extra("prefabs/extraShipData_monsters", mod="LegendaryMissions")
+# HOT FIX 2026-08-27: NOT declared. Extra ship data is off library-side
+# (sbs_utils ship_data.EXTRA_SHIP_DATA_DISABLED), so this call is already inert -
+# it is commented out as well so the intent is readable here rather than only in
+# the library. The five hulls it declares (monster1-monster5) are the non-Typhon
+# species, which MONSTER_NON_TYPHON already keeps from spawning, so nothing asks
+# the engine for a hull it was not given. Restore both together.
+# shared _monster_ship_data = ship_data_add_extra("prefabs/extraShipData_monsters", mod="LegendaryMissions")
 
 === prefab_typhon_classic
 metadata: ```
 type: prefab/monster
 side: monster
+name: ""
 ages:
     weights: [50, 35, 15]
     young:   { health: 5000,  scale: 0.7, label: Young }
@@ -53,7 +60,7 @@ brain:
     # (age does not change damage). The stage lands as a role (young/mature/ancient)
     # so ai_typhon_seek_death can gate on "ancient". Scoped to THIS prefab only.
     stage, cfg = monster_roll_age(ages)
-    monster = npc_spawn(START_X,START_Y,START_Z, cfg["label"] + " Typhon", "monster,typhon,classic," + stage, "-", "behav_typhon")
+    monster = npc_spawn(START_X,START_Y,START_Z, name, "monster,typhon,classic," + stage, "-", "behav_typhon")
     monster_bake_age(monster, cfg)
 
     monster.blob.set("body_1_color", "purple", 0)

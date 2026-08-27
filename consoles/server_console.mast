@@ -38,6 +38,10 @@ gui_reroute_clients("client_main")
     shared LETHAL_SELECT  = SETTINGS.get("LETHAL_SELECT")
     shared FRIENDLY_SELECT  = SETTINGS.get("FRIENDLY_SELECT")
     shared MONSTER_SELECT  = SETTINGS.get("MONSTER_SELECT")
+    # Opt-in as of 2026-08-25 (fallback was True) - the Piranha render crash; see
+    # settings.yaml. This fallback only applies when the key is ABSENT entirely, so it
+    # matters for a host whose settings.yaml predates the key.
+    shared MONSTER_NON_TYPHON  = SETTINGS.get("MONSTER_NON_TYPHON", False)
     shared UPGRADE_SELECT  = SETTINGS.get("UPGRADE_SELECT")
     shared seed_value  = SETTINGS.get("seed_value")
     # Packed hull+name-per-slot loadout carried by a game code (empty = none).
@@ -283,36 +287,30 @@ gui_reroute_clients("client_main")
         # blank/0. Settings.yaml / story / game-code values already set are left untouched.
         map_apply_defaults(WORLD_SELECT)
 
-        # Music. The list comes from music_get_list(), not a fixed one, so a mod that ships
-        # its own banks shows up here without this file knowing about it. It sits AFTER
-        # map_apply_defaults so a map's `Defaults: MUSIC_SELECT` is what reads as the
-        # current pick.
+        # The map's Defaults may have just named a THEATER, and the operator may have moved
+        # PLAYER_COUNT since the last build. Re-shape the roster to match, right here, while
+        # the panel is the only thing on screen.
         #
-        # Interpolated inline, like the preset dropdown above and for the same reason: a
-        # bare MAST string assignment is re-run through f-string formatting, and a display
-        # name comes from whatever mod declared the label.
-        gui_row("row-height: 30px;")
-        music_choices = music_get_list()
-        # A LABEL, not a blank: the dropdown shows the bank that is selected ("random",
-        # or a mod's display name), which tells the operator nothing about what the
-        # control IS. The 6em here was an empty spacer of the same width.
-        gui_text("$text: Music;justify:right;", "col-width: 6em;")
-        music_dd = gui_drop_down(f"$text: {get_shared_variable('MUSIC_SELECT', SETTINGS.get('MUSIC_SELECT', 'random'))}; list: {','.join(['random'] + [m.display_name for m in music_choices])}")
-        on gui_message(music_dd):
-            shared MUSIC_SELECT = music_dd.value
+        # Unconditional on purpose, and cheap: apply is diff-then-write, so a build where
+        # nothing changed touches nothing and returns an empty list. NO force= here - that is
+        # reserved for the reconcile at Start, which deliberately rebuilds every ship.
+        #
+        # Deliberately NOT player_roster_set_count() as well. Parking is what makes a ship
+        # invisible and de-crewed, and today that does not happen until Start; doing it here
+        # would make the unused hulls vanish from the panel the moment the slider moved,
+        # which is a visible change nobody asked for. The count is still reconciled at Start.
+        player_roster_apply()
 
-        # WHICH CREW staffs consoles nobody named. Guarded on there being any: music's row is
-        # unconditional because a "default" bank always exists, and crew genuinely can be
-        # empty - a mission that declares no roster has to get exactly the panel it got
-        # before. Placed AFTER map_apply_defaults above, so a map's `Defaults: CREW_SELECT`
-        # reads back as the current pick rather than being overwritten by a stale one.
-        crew_choices = crew_get_list()
-        if len(crew_choices) > 0:
-            gui_row("row-height: 30px;")
-            gui_text("$text: Crew;justify:right;", "col-width: 6em;")
-            crew_dd = gui_drop_down(f"$text: {get_shared_variable('CREW_SELECT', SETTINGS.get('CREW_SELECT', ''))}; list: {','.join(['none', 'random'] + [c.display_name for c in crew_choices])}")
-            on gui_message(crew_dd):
-                shared CREW_SELECT = crew_dd.value
+        # Music, Crew and Theater used to be hardcoded rows here, above the map's own
+        # Properties. They are map properties now - a map declares the ones it wants, the
+        # same way it declares its Difficulty or its Boss - so a mission that has no music
+        # banks, no crew rosters or no theaters does not get a control for them, and a
+        # mission that wants them says so.
+        #
+        # The helpers a map uses: music_name_list / music_selected_name,
+        # crew_name_list / crew_selected_name, theater_name_list / theater_selected_name.
+        # Each *_selected_name reads the SHARED value first and the setting second, so a
+        # map's `default shared` seed cannot overwrite a choice a profile already made.
 
         gui_row()
         gui_property_list_box(name="Options")
@@ -450,7 +448,22 @@ Main:
 === show_main_game_screen_server
     ship_id = sbs.get_ship_of_client(client_id)
     link(ship_id,"consoles", client_id)
+    # STRIP FIRST. Every other console path does (common_console_select, and both
+    # director entry points), and show_main_game_screen a few lines below says it is safe
+    # BECAUSE common_console_select strips. The server never goes through that label - it
+    # is rerouted straight here - so nothing ever took a role off client 0. It would keep
+    # `mainscreen` while showing pause_screen, operator_stats or the server menu, and
+    # every viewscreen overlay would draw over the host's own UI.
+    for cv_name in gui_get_console_types():
+        remove_role(client_id, cv_name)
     add_role(client_id, "console, mainscreen")
+    # CONSOLE_TYPE as well as the role. show_main_game_screen sets both; this variant set
+    # only the role, which leaves the host half-registered - it matches role-based
+    # audiences but not value-based ones. maststorypage routes main-screen VIEW changes
+    # (front/left/right, 3d/2d) with `linked_to(ship,"consoles") &
+    # has_inventory_value("CONSOLE_TYPE","mainscreen")`, so without this the host window
+    # never followed a view change.
+    set_inventory_value(client_id, "CONSOLE_TYPE", "mainscreen")
 
 === show_main_game_screen === 
 
@@ -669,11 +682,22 @@ Main:
         # 0,0,0 for any roster size, odd or even. Maps move these near a friendly station
         # in spawn_players, so the formation only has to hold up until then.
         _roster = SETTINGS.get("PLAYER_LIST")
+        #
+        # SEED THE ROSTER FIRST. The roster is the indirection a console binds to - a RECORD
+        # keyed by slot, rather than the live object. It owns hull/name/side/face from here
+        # on, so a theater picked later (or a PLAYER_COUNT the operator moves) reshapes these
+        # ships in place instead of leaving every console holding a stale pointer.
+        #
+        player_roster_seed(_roster)
         _slot_gap = 2000
         _slot_mid = (len(_roster)-1)/2.0
         for slot, player_ship_data in enumerate(_roster):
             _slot_x = (slot - _slot_mid) * _slot_gap
-            player_ship = player_ensure(slot, _slot_x, 0, 2000, player_ship_data["ship"], player_ship_data["name"], player_ship_data["side"])
+            # Spawn already WEARING the themed hull rather than swapping it a moment later.
+            # THEATER from settings.yaml or a profile is known by now; only a map's own
+            # `Defaults: THEATER` arrives later, and player_roster_apply() catches that.
+            _slot_hull = ship_data_art_key_for(player_ship_data["ship"])
+            player_ship = player_ensure(slot, _slot_x, 0, 2000, _slot_hull, player_ship_data["name"], player_ship_data["side"])
             player_ship_data["id"] = player_ship
             add_role(player_ship, "default_player_ship")
             set_face(player_ship, random_face(player_ship_data["face"]))
@@ -682,6 +706,40 @@ Main:
     # branches disagreed: 8 emits when creating defaults, 1 otherwise -- and every
     # handler ran 8 times, seeing a half-built roster on all but the last.
     signal_emit("create_player_ships", None)
+    #
+    # ADOPT WHAT THE MISSION SPAWNED ITSELF. A mission with PLAYER_CREATE_DEFAULT = False
+    # (HereThereBeMonsters is the model - one `player_spawn` in its own
+    # //shared/signal/create_player_ships route) skips the loop above entirely, so it has
+    # player ships and no roster records. Every console binds to RECORDS now, so its
+    # picker offered "No Player Ships" beside a live ship, and the helm's rename and hull
+    # handlers ran against a slot of None.
+    #
+    # After the emit, not before: a //shared/signal route with no await runs synchronously
+    # inside signal_emit, so the mission's ships exist by the time this line runs. Reading
+    # rather than deciding - the record is built from the ship - and idempotent, so the
+    # default path above (already slotted by player_ensure) adopts nothing.
+    #
+    player_roster_adopt()
     ->END
 
 
+#
+# THE SAME SIGNAL, for a mission that spawns its OWN player ships. Its roster came from
+# player_roster_adopt() just above, so the crew's picks on the console picker are sitting
+# in records that nothing else would carry to a ship: the full reconcile
+# (//shared/signal/reconcile_player_roster in fleets/map_common.mast) is gated on
+# PLAYER_CREATE_DEFAULT and never runs for these missions, which is how a rename on the
+# helm picker went nowhere at all.
+#
+# HERE rather than beside that route, because it has to reach missions that do not load
+# the fleets addon - HereThereBeMonsters declares consoles and not fleets. The two routes
+# are mutually exclusive on the same flag, so a mission loading both still reconciles once.
+#
+# APPLY AND NOTHING ELSE. No seed, no set_count, no cull: the count, the parking and the
+# game-code loadout all belong to the roster SETTINGS authored, and a mission that spawns
+# its own ships owns how many there are. Apply diffs before it writes, so on a roster
+# nobody edited this touches no engine object at all.
+#
+//shared/signal/reconcile_player_roster if not PLAYER_CREATE_DEFAULT
+    player_roster_apply()
+    ->END

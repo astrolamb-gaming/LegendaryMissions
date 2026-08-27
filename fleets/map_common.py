@@ -15,6 +15,7 @@ import random
 from fleet import fleet_spawn
 from sbs_utils.procedural.fleet_tables import (
     fleet_table_get, fleet_table_races, fleet_table_pick_race)
+from sbs_utils.procedural.ship_data import art_key_for
 from elite_abilitites import elite_get_all_abilities, elite_is_engine_ability, random_bits
 
 
@@ -37,6 +38,70 @@ def player_ship_update_friendly(player_id, friends, initial_scan = False):
 
 
 
+
+
+# The stock theater, declared in races/theaters.amd. Used when nothing else is selected, so
+# the maps have no enemy roster of their own to fall back to any more.
+STOCK_THEATER = "legendary"
+
+
+def fleet_pick_enemy_race(race_list=None, weights=None, difficulty=None, eligible=None):
+    """This map's enemy race, from the active THEATER's ladder.
+
+    THE MAPS USED TO CARRY THIS AS TWO POSITIONAL ARRAYS - a four-name
+    ``enemyTypeNameList`` and a table of weight rows zipped against it by position. Nothing
+    read data, so who a mission fought was a literal no profile and no mod could reach, and
+    a roster was four long because a table was four columns wide. A total conversion could
+    therefore only ALIAS its factions onto the four stock names; that is why every theater in
+    the TNG pack rosters the same four and differs only in its art.
+
+    Weights are keyed by race now (``kralien:70``), so the ladder has no length and no order
+    to get wrong, and a roster can mix mod and stock races freely.
+
+    Args:
+        race_list: the caller's own spelling of the races it knows, when it has one. NOT a
+            gate - a race the theater rosters is returned even if this map has never heard of
+            it. Kept because a caller that still compares against its own literals wants a
+            match rather than a lower-cased roster entry.
+        weights: a caller-supplied row, used only if the theater declares none.
+        difficulty: which ``Weights <n>:`` tier to read - the 1-based DIFFICULTY.
+        eligible: what the race must be able to DO. borderwar and deepstrike pass
+            `race_has_station`, because they build enemy starbases and not every race has
+            one - which is what their shortened three-name list was really encoding.
+    """
+    from sbs_utils.procedural.amd_theater import theater_pick_race, theater_get
+    pick = theater_pick_race(weights, names=race_list, difficulty=difficulty,
+                             eligible=eligible)
+    if pick is None and theater_get() is None:
+        # No theater selected at all - use the stock ladder by name rather than a literal.
+        pick = theater_pick_race(weights, names=race_list, key=STOCK_THEATER,
+                                 difficulty=difficulty, eligible=eligible)
+    if pick is not None:
+        return pick
+    # Last resort: whatever the caller knows. Reached when the selected theater rosters
+    # nothing this map can use - every race filtered out by `eligible`, say - and returning
+    # None here would leave the map with no enemy at all.
+    fallback = list(race_list or []) or fleet_enemy_races(eligible)
+    if not fallback:
+        return None
+    if weights and len(weights) == len(fallback):
+        return random.choices(fallback, weights=weights)[0]
+    return random.choice(fallback)
+
+
+def fleet_enemy_races(eligible=None):
+    """Every race that can raid, honoring ``eligible``. The roster, with no literal in it.
+
+    ``race_npc_list`` is three gates at once - in the ship table, enabled in NPC_RACES, and
+    carrying a fleet ladder - because each of those failing on its own is invisible: a race
+    with no ladder makes `fleet_create` print and return None, which reads as "this mission
+    has no enemies".
+    """
+    from sbs_utils.procedural.races import race_npc_list
+    races = race_npc_list()
+    if eligible is not None:
+        races = [r for r in races if eligible(r)]
+    return races
 
 
 def fleet_remove_ship(id_or_obj):
@@ -83,7 +148,11 @@ def fleet_create(race, fleet_diff, posx, posy, posz, fleet_roles = "RaiderFleet"
     # in each race_* addon as fleets.yaml and register themselves, gated on NPC_RACES.
     race = (race or "").strip().lower()
     if race in ("", "random"):
-        race = fleet_table_pick_race() or "kralien"
+        # "random" used to mean a FLAT pick over every registered ladder, with a literal
+        # "kralien" behind it - so a mission that set a theater still got an even mix from
+        # any path that said "random", and the theater's ladder was quietly bypassed.
+        race = fleet_pick_enemy_race() or fleet_table_pick_race() or "kralien"
+        race = str(race).strip().lower()
     siege_fleet = fleet_table_get(race, fleet_diff)
     if not siege_fleet:
         # A race with no registered ladder - not in NPC_RACES, or a typo. Say so: the
@@ -129,7 +198,15 @@ def fleet_create(race, fleet_diff, posx, posy, posz, fleet_roles = "RaiderFleet"
 
 #    carrier_count = 0
     for b in range(num_ships):
-        art_id = siege_fleet[b]
+        # ART ONLY. A fleet ladder names its hulls OUTRIGHT, class by class, so a wave keeps
+        # its shape - which means these never reach RACE_ART, the faction-lookup route the
+        # basic_enemy/defender prefabs use. They get the key map instead, so a mod can
+        # re-point them while the ladder's choices (battleship stays a battleship) survive.
+        # No-op unless ART_KEYS is set, and it falls back to the stock key when the
+        # replacement is not in the ship table.
+        #
+        # `roles` below - and therefore the side, and therefore diplomacy - is untouched.
+        art_id = art_key_for(siege_fleet[b])
         if faction_side:
             roles = f"{race},{ship_roles}" if ship_roles is not None else f"{race},raider"
         else:

@@ -1,3 +1,16 @@
+# Presentation pickers (map options). These are declared HERE, not hardcoded into the
+# server console, so a mission gets a control because its map asked for one - a mission
+# with no music banks, no crew rosters or no theaters shows nothing.
+#
+# Each seed reads the SHARED value first and the setting second, so this `default` cannot
+# overwrite a choice a profile already made with the fallback.
+default shared MUSIC_SELECT = music_selected_name()
+default shared MUSIC_LIST = music_name_list()
+default shared CREW_SELECT = crew_selected_name()
+default shared CREW_LIST = crew_name_list()
+default shared THEATER = theater_selected_name()
+default shared THEATER_LIST = theater_name_list()
+
 @map/deep_strike "Deep Strike"
 " There are no friendly bases in this scenario,
 " just a friendly bulk cargo ship that can resupply
@@ -8,6 +21,9 @@ Properties:
   Main:
     Player Ships: 'gui_int_slider("$text:int;low: 1.0;high:8.0;", var= "PLAYER_COUNT")'
     Difficulty: 'gui_int_slider("$text:int;low: 1.0;high:11.0;", var= "DIFFICULTY")'
+    Music: 'gui_drop_down("$text: {MUSIC_SELECT};list: {MUSIC_LIST}", var="MUSIC_SELECT")'
+    Crew: 'gui_drop_down("$text: {CREW_SELECT};list: {CREW_LIST}", var="CREW_SELECT")'
+    Theater: 'gui_drop_down("$text: {THEATER};list: {THEATER_LIST}", var="THEATER")'
   Map:
     Terrain: 'gui_drop_down("$text: {TERRAIN_SELECT};list: none, few, some, lots, max",var="TERRAIN_SELECT")'
     Lethal Terrain: 'gui_drop_down("$text: {LETHAL_SELECT};list: none, few, some, lots, max", var="LETHAL_SELECT")'
@@ -41,10 +57,9 @@ Properties:
     #------------------------------------------------------------------------------------------------------------
     # Determine Enemy Antagonists
 
-    enemyTypeNameList = ["Kralien", "Torgoth", "Arvonian"]
-    enemy_temp = []
-    enemy_temp = random.choices(enemyTypeNameList, weights=(50, 25, 25))
-    enemy1 = enemy_temp[0]
+    # The THEATER's ladder, filtered to races that can be built as a station - which is what
+    # the old three-name literal was encoding, since ximni have no starbase hull.
+    enemy1 = fleet_pick_enemy_race(difficulty=DIFFICULTY, eligible=race_has_station)
 
     #------------------------------------------------------------------------------------------------------------
     # Reposition Player Ship, spawn Cargo Tender
@@ -102,15 +117,16 @@ Properties:
         num_enemy_stations = 3
     station_step = 100000/num_enemy_stations
 
-    if enemy1 == "Kralien":
-        station_prefix = "KB"
-        station_type = "starbase_kralien"
-    if enemy1 == "Torgoth": 
-        station_prefix = "TB"
-        station_type = "starbase_torgoth"
-    if enemy1 == "Arvonian":
-        station_prefix = "AB"
-        station_type = "starbase_arvonian"
+    # Derived from the ship table; the prefix is the one part it cannot say and is declared
+    # in races/races.amd.
+    station_prefix = race_station_prefix(enemy1)
+    station_type = race_station_hull(enemy1)
+
+    # ART ONLY - resolve the stock station key through ART_KEYS once, here, so both the
+    # spawn and the navproxy below draw the same hull. No-op unless a mission or profile
+    # sets it. The roles string keeps naming the mission's own faction, so diplomacy is
+    # unchanged; only the art moves.
+    station_type = ship_data_art_key_for(station_type)
 
     # for each station
     for index in range(num_enemy_stations):
@@ -124,22 +140,16 @@ Properties:
         #make the station ----------------------------------
         name = "{station_prefix} {index+1}"
 
-        if enemy1 == "Kralien":
-            enemy_station_object = npc_spawn(*pos, name, "raider, kralien, enemy, delprox, station", station_type, "behav_station")
-        if enemy1 == "Torgoth":
-            enemy_station_object = npc_spawn(*pos, name, "raider, torgoth, enemy, delprox, station", station_type, "behav_station")
-        if enemy1 == "Arvonian":
-            enemy_station_object = npc_spawn(*pos, name, "raider, arvonian, enemy, delprox, station", station_type, "behav_station")
+        # The roles string only ever differed by the race name, so it composes.
+        station_roles = f"raider, {enemy1.lower()}, enemy, delprox, station"
+        enemy_station_object = npc_spawn(*pos, name, station_roles, station_type, "behav_station")
         eso_id = to_id(enemy_station_object)
         nav_obj = sim.add_navproxy(eso_id, name, station_type, "#A44")
         set_inventory_value(eso_id, "navprox_id", to_id(nav_obj))
 
-        if enemy1 == "Kralien":
-            set_face(to_id(enemy_station_object), random_kralien())
-        if enemy1 == "Torgoth":
-            set_face(to_id(enemy_station_object), random_torgoth())
-        if enemy1 == "Arvonian":
-            set_face(to_id(enemy_station_object), random_arvonian())
+        # random_face dispatches by race and honors a mod's registered faces and the
+        # theater's Faces: map, which the three hardcoded calls could not.
+        set_face(to_id(enemy_station_object), random_face(race_faces(enemy1)))
 
         print(f"{enemy1} Station created: {int(pos.x)}, {int(pos.y)}, {int(pos.z)}")
 

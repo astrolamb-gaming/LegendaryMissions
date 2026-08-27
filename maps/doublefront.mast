@@ -1,3 +1,16 @@
+# Presentation pickers (map options). These are declared HERE, not hardcoded into the
+# server console, so a mission gets a control because its map asked for one - a mission
+# with no music banks, no crew rosters or no theaters shows nothing.
+#
+# Each seed reads the SHARED value first and the setting second, so this `default` cannot
+# overwrite a choice a profile already made with the fallback.
+default shared MUSIC_SELECT = music_selected_name()
+default shared MUSIC_LIST = music_name_list()
+default shared CREW_SELECT = crew_selected_name()
+default shared CREW_LIST = crew_name_list()
+default shared THEATER = theater_selected_name()
+default shared THEATER_LIST = theater_name_list()
+
 @map/double_front "Double Front"
 "Bases are in a corner, protected by dense minefields
 " while the enemies advance from two sides. This layout
@@ -8,6 +21,9 @@ Properties:
   Main:
     Player Ships: 'gui_int_slider("$text:int;low: 1.0;high:8.0;", var= "PLAYER_COUNT")'
     Difficulty: 'gui_int_slider("$text:int;low: 1.0;high:11.0;", var= "DIFFICULTY")'
+    Music: 'gui_drop_down("$text: {MUSIC_SELECT};list: {MUSIC_LIST}", var="MUSIC_SELECT")'
+    Crew: 'gui_drop_down("$text: {CREW_SELECT};list: {CREW_LIST}", var="CREW_SELECT")'
+    Theater: 'gui_drop_down("$text: {THEATER};list: {THEATER_LIST}", var="THEATER")'
   Map:
     Terrain: 'gui_drop_down("$text: {TERRAIN_SELECT};list: none, few, some, lots, max",var="TERRAIN_SELECT")'
     Lethal Terrain: 'gui_drop_down("$text: {LETHAL_SELECT};list: none, few, some, lots, max", var="LETHAL_SELECT")'
@@ -61,12 +77,10 @@ Properties:
     # For Single Front, one enemy is randomly chosen as the attacker, so all fleets will be chosen from that enemy.
     # For Double Front, two enemies are randomly choseen, each attacking from a different direction. Same enemy may be chosen twice.
 
-    enemyTypeNameList = ["Kralien", "Torgoth", "Arvonian", "Ximni"]
-    enemy_temp = []
-    enemy_temp = random.choices(enemyTypeNameList, weights=(40, 20, 20, 20))
-    enemy1 = enemy_temp[0]
-    enemy_temp = random.choices(enemyTypeNameList, weights=(40, 20, 20, 20))
-    enemy2 = enemy_temp[0]
+    # TWO draws, independent - the comment above says the same enemy may be chosen twice, and
+    # that is still true. The map says how many attackers; the theater says the odds.
+    enemy1 = fleet_pick_enemy_race(difficulty=DIFFICULTY)
+    enemy2 = fleet_pick_enemy_race(difficulty=DIFFICULTY)
 
     # Pick a random direction for both attackers, 1 = North, 2 = East, 3 = South, 4 = West
     enemyDirectionList = [1, 2, 3, 4]
@@ -79,11 +93,10 @@ Properties:
     fleet_count2 = 1 + int(DIFFICULTY/2)
     fleet_index = int(DIFFICULTY - 1)
 
-    # Ximni fleets are typically only one ship, so double fleets to balance this out until we code some better Ximni AI.
-    if enemy1 == "Ximni":
-        fleet_count1 = fleet_count1*2 
-    if enemy2 == "Ximni":
-        fleet_count2 = fleet_count2*2 
+    # "Ximni fleets are typically only one ship, so double fleets to balance this out" - now
+    # declared as `Fleet Scale` in races/races.amd, so it applies to whichever race says it.
+    fleet_count1 = int(fleet_count1 * race_fleet_scale(enemy1))
+    fleet_count2 = int(fleet_count2 * race_fleet_scale(enemy2))
 
     print(f"Fleet Count1: {fleet_count1} Enemy1: {enemy1} Direction1: {direction1} Fleet Count2: {fleet_count2} Enemy2: {enemy2} Direction2: {direction2}")
 

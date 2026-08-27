@@ -7,6 +7,25 @@ default shared SIEGE_TIMEOUT = "Win"
 # the raiders thin out (siege_enemies_low), or None. BOSS_LIST feeds the dropdown.
 default shared BOSS_SELECT = "None"
 default shared BOSS_LIST = siege_boss_list()
+# WHO you fight and how everyone is dressed (map option). Opt-in per map, exactly like
+# Boss above: a mission with no theaters declared gets a list of just "None".
+#
+# THEATER is seeded from the SETTING rather than defaulted to "None", or this `default`
+# would overwrite a profile's `THEATER: dominion_war` with "None" the moment the panel
+# built - the feature would look wired and select nothing.
+default shared THEATER = theater_selected_name()
+default shared THEATER_LIST = theater_name_list()
+
+# Presentation pickers (map options). These are declared HERE, not hardcoded into the
+# server console, so a mission gets a control because its map asked for one - a mission
+# with no music banks, no crew rosters or no theaters shows nothing.
+#
+# Each seed reads the SHARED value first and the setting second, so this `default` cannot
+# overwrite a choice a profile already made with the fallback.
+default shared MUSIC_SELECT = music_selected_name()
+default shared MUSIC_LIST = music_name_list()
+default shared CREW_SELECT = crew_selected_name()
+default shared CREW_LIST = crew_name_list()
 
 @map/siege "Siege"
 " In this scenario, bases will be located in the center of the sector, 
@@ -18,6 +37,9 @@ Properties:
     Player Ships: 'gui_int_slider("$text:int;low: 1.0;high:8.0;", var= "PLAYER_COUNT")'
     Difficulty: 'gui_int_slider("$text:int;low: 1.0;high:11.0;", var= "DIFFICULTY")'
     Boss: 'gui_drop_down("$text: {BOSS_SELECT};list: {BOSS_LIST}", var="BOSS_SELECT")'
+    Theater: 'gui_drop_down("$text: {THEATER};list: {THEATER_LIST}", var="THEATER")'
+    Music: 'gui_drop_down("$text: {MUSIC_SELECT};list: {MUSIC_LIST}", var="MUSIC_SELECT")'
+    Crew: 'gui_drop_down("$text: {CREW_SELECT};list: {CREW_LIST}", var="CREW_SELECT")'
   Map:
     Map Size: 'gui_drop_down("$text: {MAP_SIZE};list: Small, Medium, Large", var="MAP_SIZE")'
     Terrain: 'gui_drop_down("$text: {TERRAIN_SELECT};list: none, few, some, lots, max",var="TERRAIN_SELECT")'
@@ -185,9 +207,11 @@ GameCode:
     # phase 5: enemy fleets
     if seed_value != 0:
         random.seed(seed_value + 5)
-    enemyTypeNameList = ["Kralien", "Torgoth", "Arvonian", "Ximni"]
-
-    diff_weight = [ [85, 5, 5, 5], [82, 6, 6, 6], [79, 7, 7, 7], [76, 8, 8, 8], [70, 10, 10, 10], [64, 12, 12, 12], [58, 14, 14, 14], [46, 18, 18, 18], [34, 22, 22, 22], [22, 26, 26, 26], [10, 30, 30, 30]]
+    # The four-name list and the eleven weight rows that used to sit here are now ONE keyed
+    # ladder in races/theaters.amd. They were always the same thing: every row summed to 100
+    # and was zipped against the list by position, so the names simply lived somewhere else.
+    # Keyed, the roster is not four long because a table is four columns wide - which is what
+    # forced a total conversion to alias its factions onto these four names.
     
     fleet_count = 3 + int(DIFFICULTY/2)
     fleet_index = int(DIFFICULTY - 1)
@@ -233,9 +257,10 @@ GameCode:
         spawn_points = None
         
     for a in range(fleet_count):
-        enemy_temp = random.choices(enemyTypeNameList, weights=diff_weight[fleet_index])
-        
-        enemy = enemy_temp[0]
+        # One draw per fleet, as before - the map says how many draws, the theater says the
+        # odds. DIFFICULTY is 1-based and picks the ladder tier directly; `fleet_index` was
+        # only ever DIFFICULTY-1 because the table was a 0-based list.
+        enemy = fleet_pick_enemy_race(difficulty=DIFFICULTY)
         if spawn_points is None:
             fleet_pos = Vec3.rand_in_sphere(39990, 40000, False, True)
             debug_print("Wrong spawn")
