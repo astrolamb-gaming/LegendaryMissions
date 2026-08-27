@@ -330,6 +330,10 @@ def layout_item_update_style(item, style):
 def gm_ship_spawn_select_template(item):
     gui_row("padding:13px;")
     # print(f"{item}")
+    if item is None:
+        print("Item is None!")
+    else:
+        print(item)
     art = item.get("art_id", "")
     # gui_ship(f"{art}", style="col-width:50px;padding:0,0,5px,0;")
     dat = get_ship_data_for(art)
@@ -343,6 +347,8 @@ def gm_ship_spawn_select_template(item):
         else:
             desc = f"{desc}"
         roles = dat.get("roles",roles)
+    else:
+        print(f"data is None for {art}")
 
     with gui_sub_section():
         # gui_row("row-height:1em;")
