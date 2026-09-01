@@ -15,6 +15,13 @@
 # letting the warning repeat.
 
 masses:
+  # ANCHORS. Nothing should ever reach the mass rule with one of these - the library
+  # refuses to pull an ANCHOR_ROLES body at all - but if a mission clears that rule, a
+  # reversal is the behavior you want: grab a black hole and it drags YOU. Listing them
+  # also silences the once-per-hull "no tether mass for hull 'maelstrom'" warning this
+  # bug has been logging since the tether shipped.
+  maelstrom: 100000       # black hole
+  planet: 100000
   arvonian_carrier: 5
   arvonian_destroyer: 2
   arvonian_fighter: 1
@@ -49,6 +56,16 @@ masses:
   torgoth_goliath: 4
   torgoth_leviathan: 5
   transport_ship: 6
+  # Turret hardware. Not ships - a crate is a payload and a tower is a gun on a mount, so
+  # this is bulk rather than hullpoints. All four are npc_spawn'd, so LM_TETHER_HAULABLE
+  # covers them through __npc__ and all four were falling to the corvette default and
+  # warning about it. The crate is the point: it exists to be towed into position, and at
+  # 2 against a light cruiser's 3 it moves without the beam flipping and dragging the
+  # cruiser to the crate instead.
+  lm_turret_crate: 2
+  lm_turret_mount: 1
+  lm_turret_beam: 2
+  lm_turret_heavy: 3
   tsn_battle_cruiser: 4
   tsn_battleship: 5
   tsn_bomber: 1

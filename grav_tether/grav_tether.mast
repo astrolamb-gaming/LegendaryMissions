@@ -8,10 +8,23 @@
 # Engine-verified: the hold-click popup shows and toggles tether state in real Cosmos.
 #
 # Role -> mode (confirmed roles; pickups carry item,upgrade):
-#   item / upgrade                -> Reel (draw in for collection)
-#   station / asteroid / __npc__  -> Tow  (rope rest-length 500, stiffness ~5)
-#   anything else                 -> Lock (rigid grab)
-#   already tethered              -> Release
+#   item / upgrade                     -> Reel (draw in for collection)
+#   lm_tether_haulable (LM_TETHER_HAULABLE:
+#     station / asteroid / __npc__ /
+#     derelict / wreck / hulk)         -> Tow (rope 500, stiffness ~5) or Lock (rigid)
+#   black_hole in reach                -> Slingshot (swing, rope clamped clear of the well)
+#   anything else                      -> nothing
+#   already tethered                   -> Release
+#
+# AN ALLOWLIST, NOT A BLACKLIST. This used to read "anything that is not a pickup, a
+# station, a rock or an NPC gets a rigid Grav Lock", which meant a gunner could Grav Lock
+# a BLACK HOLE. That makes the hole the LOAD: the beam reels it onto the hull, the
+# library caps the ship to impulse so it cannot warp away, and black_hole_lethal_watch
+# (collisions/collision.mast) explodes anything within 500u of it - then the hole stays
+# parked wherever it was dropped, killing whatever comes near for the rest of the match.
+# The same branch also offered a rigid lock on every nebula, mine, planet, marker and GM
+# camera rig. The library now refuses to PULL an anchor at all (grav_tether ANCHOR_ROLES);
+# this menu is the other half - it stops offering it.
 #
 # Impulse-only is canonical (old-game Arena a28): the primitive caps the source back to
 # impulse by default (grav_tether_set_overspeed_default to change to snap/off).
@@ -23,25 +36,47 @@
 # the selection, this menu offered to tether the WEAPONS TARGET no matter what was
 # clicked, and offered nothing at all when the console had no lock. It is 0 for a
 # hold-click on empty space, so the guard is required, not defensive.
-//popup/weapons if has_any_role(WEAPONS_ORIGIN_ID, "__player__") and WEAPONS_POPUP_ID != 0 and WEAPONS_POPUP_ID != WEAPONS_ORIGIN_ID
-    # grav_tether_HAS (the registry), not grav_tether_get (the live engine connection).
-    # A Tow is a rope-TOGGLE: it deletes the connection whenever the load is inside the
-    # rope length and re-adds it when the load drifts out - so `get` reads None for most
-    # of a perfectly normal tow. Gated on that, this menu offered "Grav Tow" to something
-    # already under tow and never offered "Release", so a crew could not let go.
-    gt_has = grav_tether_has(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID)
+# Nothing is on offer mid-slingshot. The arc is a few seconds long and the helm is
+# commandeered for the duration; letting go half way round would drop the ship on an
+# arbitrary bearing, which is not an abort anyone wants.
+//popup/weapons if has_any_role(WEAPONS_ORIGIN_ID, "__player__") and WEAPONS_POPUP_ID != 0 and WEAPONS_POPUP_ID != WEAPONS_ORIGIN_ID and not lm_tether_sling_is(WEAPONS_ORIGIN_ID)
+    # grav_tether_BETWEEN (the registry, either way round), not grav_tether_get (the live
+    # engine connection) and not grav_tether_has (directional). Two ways this goes wrong,
+    # and both end the same: the menu re-offers the grab and never offers Release, so a
+    # crew cannot let go.
+    #   * `get` reads None for most of a perfectly normal tow, because a Tow is a rope
+    #     TOGGLE - it drops the connection whenever the load is inside the rope length.
+    #   * `has` is directional, and a SWING is registered the other way up: the anchor is
+    #     the source and the ship is the load. So has(me, that) is False for the very
+    #     slingshot this menu just opened.
+    gt_has = grav_tether_between(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID)
     if gt_has:
         + "Release":
-            grav_tether_release(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID)
+            grav_tether_release_between(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID)
     if not gt_has and has_any_role(WEAPONS_POPUP_ID, "item,upgrade"):
         + "Grav Reel":
             grav_tether_reel(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID)
-    if not gt_has and has_any_role(WEAPONS_POPUP_ID, "station,asteroid,__npc__"):
+    # Tow AND Lock on the same set: dragging a derelict behind you and grabbing it
+    # rigidly are both reasonable and only the gunner knows which is wanted - it is the
+    # same pair of verbs the fighter popup below already offers.
+    if not gt_has and lm_tether_haulable(WEAPONS_POPUP_ID):
         + "Grav Tow":
             grav_tether_tow(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID, 500)
-    if not gt_has and not has_any_role(WEAPONS_POPUP_ID, "item,upgrade,station,asteroid,__npc__"):
         + "Grav Lock":
             grav_tether_lock(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID)
+    # A hole is an ANCHOR, never a load. A slingshot is the one thing a tether may do with
+    # one - and it is not a tether at all underneath: an invisible carrier flies the arc
+    # and the engine holds the ship welded to it, so the curve is engine motion rather
+    # than something re-pointed ten times a second. See lm_tether_slingshot_hole.
+    #
+    # WIDE is clamped clear of the gravity well. CLOSE is inside it: faster, because the
+    # arc is shorter, and the hole's own pull is fighting the carrier the whole way.
+    if not gt_has and lm_tether_hole_in_reach(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID) and lm_tether_sling_ready(WEAPONS_ORIGIN_ID):
+        + "Slingshot (wide)":
+            lm_tether_slingshot_hole(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID)
+        + "Slingshot (close)":
+            lmgt_tight = lm_tether_hole_close_rope(WEAPONS_POPUP_ID)
+            lm_tether_slingshot_hole(WEAPONS_ORIGIN_ID, WEAPONS_POPUP_ID, lmgt_tight)
 
 
 # ---------------------------------------------------------------------------------------
@@ -90,8 +125,24 @@
     lmgt_hit = EVENT.sub_float or 0
     ->END if lmgt_hit < LM_TETHER_BREAK_DAMAGE
     if grav_tether_involves(DAMAGE_TARGET_ID):
+        # Tell whoever was HAULING, not whatever was hit. Two reasons the old
+        # comms_broadcast(DAMAGE_TARGET_ID, ...) was wrong, and the second one raised:
+        #   * the shot object is usually the LOAD, and a barge is not a player ship - it
+        #     has no waterfall to write to. The haulers are its tether SOURCES. (When the
+        #     towing ship itself is shot it is a source, so it tells itself.)
+        #   * the same hit can DESTROY what it shook loose, and comms_broadcast to a freed
+        #     object raises "invalid space object while calling SendMessageToPlayerShip".
+        #     A failing expression stops the command, so the route ended there - once per
+        #     qualifying hit, for the rest of the mission.
+        # Gather before releasing: grav_tether_release_any drops the very association
+        # these lookups read.
+        lmgt_told = grav_tether_sources_of(DAMAGE_TARGET_ID)
+        if grav_tether_targets_of(DAMAGE_TARGET_ID):
+            lmgt_told = lmgt_told + [DAMAGE_TARGET_ID]
+        lmgt_told = [lmgt_t for lmgt_t in lmgt_told if object_exists(lmgt_t)]
         grav_tether_release_any(DAMAGE_TARGET_ID)
-        comms_broadcast(DAMAGE_TARGET_ID, "Grav-tether shaken loose by the hit.")
+        if lmgt_told:
+            comms_broadcast(lmgt_told, "Grav-tether shaken loose by the hit.")
 
 
 # Ran the reserves dry mid-haul. The library drops the load rather than pinning the ship
@@ -100,6 +151,27 @@
     default SOURCE_ID = 0
     ->END if SOURCE_ID == 0
     comms_broadcast(SOURCE_ID, "Grav-tether offline - not enough power to hold the load.")
+
+
+# The haul changed weight class, or a hull joined it. Every cost this beam charges used
+# to be invisible: a crew towing a starbase was capped to impulse, cut to a quarter
+# throttle and burning its reserves, and the ship simply felt broken. The only two signals
+# that existed both fired after the haul had already failed.
+#
+# Addressed to SOURCE_ID, not the load. The library emits one of these PER SHIP on the
+# beam - which is what a per-console readout wants - so broadcasting to the target would
+# print four identical lines into one waterfall the moment a fourth tug joined.
+//shared/signal/grav_tether_strain
+    default SOURCE_ID = 0
+    default STRAIN = ""
+    default PULLERS = 1
+    ->END if SOURCE_ID == 0
+    if PULLERS > 1:
+        comms_broadcast(SOURCE_ID, f"Grav-tether: {PULLERS} hulls on the beam - load is {STRAIN}.")
+    if PULLERS <= 1 and STRAIN == "overloaded":
+        comms_broadcast(SOURCE_ID, "Grav-tether overloaded - this needs another ship on it.")
+    if PULLERS <= 1 and STRAIN != "overloaded":
+        comms_broadcast(SOURCE_ID, f"Grav-tether under {STRAIN} load - engines are paying for it.")
 
 
 # Too fast to get hold of. Says WHY, or the button just looks broken.
@@ -119,11 +191,11 @@
 
 # --- phase 5 -------------------------------------------------------------------------
 # A black hole is the anchor the swing was invented for. Offered only when one is
-# actually in reach, and the rope is clamped clear of the gravity well by
-# lm_tether_swing_hole - the tether must never be the thing that drops someone in.
-//popup/tether if has_any_role(TETHER_ORIGIN_ID, "__player__,cockpit") and lm_tether_nearest_hole(TETHER_ORIGIN_ID) is not None
+# actually in reach and the throw has recharged; the arc is clamped clear of the gravity
+# well - the tether must never be the thing that drops someone in.
+//popup/tether if has_any_role(TETHER_ORIGIN_ID, "__player__,cockpit") and lm_tether_nearest_hole(TETHER_ORIGIN_ID) is not None and lm_tether_sling_ready(TETHER_ORIGIN_ID)
     + "Slingshot the black hole":
-        lm_tether_swing_hole(TETHER_ORIGIN_ID, lm_tether_nearest_hole(TETHER_ORIGIN_ID))
+        lm_tether_slingshot_hole(TETHER_ORIGIN_ID, lm_tether_nearest_hole(TETHER_ORIGIN_ID))
 
 
 # Pinned by a hostile beam. Says what to do about it, because a ship that is suddenly
@@ -137,3 +209,33 @@
     default SHIP_ID = 0
     ->END if SHIP_ID == 0
     comms_broadcast(SHIP_ID, "Tether snapped - you are free.")
+
+
+# Thrown. Says which pass it was, because the crew chose.
+//shared/signal/lm_tether_sling_start
+    default SHIP_ID = 0
+    default CLOSE = False
+    ->END if SHIP_ID == 0
+    if CLOSE:
+        comms_broadcast(SHIP_ID, "Slingshot - close pass. Hold on.")
+    if not CLOSE:
+        comms_broadcast(SHIP_ID, "Slingshot - coming round the far side.")
+
+
+# Out the other side. A close pass costs a system, so say so rather than let the crew
+# find the damage on the grid and wonder what hit them.
+//shared/signal/lm_tether_sling_done
+    default SHIP_ID = 0
+    default CLOSE = False
+    ->END if SHIP_ID == 0
+    if CLOSE:
+        comms_broadcast(SHIP_ID, "Clear of the well - that pass strained a system.")
+    if not CLOSE:
+        comms_broadcast(SHIP_ID, "Clear of the well. Helm is yours.")
+
+
+# The cooldown timer emits this itself (set_timer signal=), so nothing has to poll it.
+//shared/signal/lm_tether_sling_ready
+    default TIMER_AGENT_ID = 0
+    ->END if TIMER_AGENT_ID == 0
+    comms_broadcast(TIMER_AGENT_ID, "Slingshot recharged.")
