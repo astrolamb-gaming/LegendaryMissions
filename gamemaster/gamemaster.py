@@ -594,6 +594,59 @@ def _gm_format_fleet_info(obj_id):
     return fleet_name, flagship_ref
 
 
+def gm_selected_fleet_data(obj_id):
+    """Return the selected ship's fleet name and its current ship members."""
+    fleet_id = get_inventory_value(obj_id, "my_fleet_id", None)
+    if not fleet_id:
+        return None, []
+
+    fleet_obj = to_object(fleet_id)
+    fleet_name = getattr(fleet_obj, "name", None) if fleet_obj is not None else None
+    if not fleet_name:
+        fleet_name = f"Fleet {fleet_id}"
+
+    ships = []
+    for ship_id in linked_to(fleet_id, "ship_list"):
+        ship = to_object(ship_id)
+        if ship is None:
+            continue
+        ship_type, origin, _side, ship_data = _gm_get_ship_data_fields(ship)
+        roles = ship_data.get("roles") or _gm_format_roles(ship) or "none"
+        ships.append({
+            "ship": ship,
+            "ship_id": ship_id,
+            "name": getattr(ship, "name", None) or str(ship_id),
+            "type": ship_type,
+            "origin": origin,
+            "roles": roles,
+        })
+
+    ships.sort(key=lambda item: str(item.get("name", "")).lower())
+    return fleet_name, ships
+
+
+def gm_selected_fleet_ship_template(item):
+    """Render one removable ship entry in the selected-fleet listbox."""
+    name = gui_text_escape(str(item.get("name", "Unknown ship")))
+    ship_type = gui_text_escape(str(item.get("type", "unknown")))
+    origin = gui_text_escape(str(item.get("origin", "unknown")))
+    roles = gui_text_escape(str(item.get("roles", "none")))
+
+    gui_row("row-height: 3.5em;")
+    with gui_sub_section():
+        gui_row("row-height: 1.2em;")
+        gui_text(f"$text:{name};font:gui-2;color:#bbb; col-width:content;")
+        gui_blank()
+        remove_button = gui_text(f"$text:X;","click_background: red; click_text:; col-width: content;")
+        gui_row("row-height: 1.1em;")
+        gui_text(f"$text:Type: {ship_type}  Origin: {origin};")
+        gui_row("row-height: 1.1em;")
+        gui_text(f"$text:Roles: {roles};")
+        # remove_button = gui_button("Remove", data=item)
+        remove_button.data = item
+        gui_message(remove_button, "gm_remove_selected_fleet_ship")
+
+
 def gm_selected_object_details(gm_id):
     """Build a multi-line details block for the GM-selected object."""
     sel = get_inventory_value(gm_id, "gamemaster_prev_selection", None)

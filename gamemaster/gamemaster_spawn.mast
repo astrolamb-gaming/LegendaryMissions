@@ -78,10 +78,13 @@ priority: 20 # Smaller number is higher priority
                 spawn_side = "raider" # For now
             else:
                 spawn_side = "civilian"
-            spawn_roles = spawn_side + selection.get("roles","")
-            art = selection.get("artfileroot")
+            spawn_roles = selection.get("roles","")
+            # art = selection.get("artfileroot")
+            art = selection.get("key")
+            cambot = sbs.get_ship_of_client(client_id)
+            pos = gamemaster_get_pos(cambot, "lmb")
 
-            prefab_spawn(prefab_single_ship, data={"fleet_roles":spawn_roles, "ship_art": art, "side_value": spawn_side})
+            prefab_spawn(prefab_single_ship, data={"ship_role":spawn_roles,"ship_art": art, "side_value": spawn_side}, OFFSET_X=pos.x, OFFSET_Y=pos.y, OFFSET_Z=0)
 
         on change len(selected_list):
             selected_origins = []
