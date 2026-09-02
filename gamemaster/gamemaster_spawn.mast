@@ -61,11 +61,27 @@ priority: 20 # Smaller number is higher priority
         lb = gui_list_box(items, "", select=True, item_template=gm_ship_spawn_select_template)
         gui_row("row-height: min-content;")
         gui_text("$text:Spawn Side:;justify:center;")
-        gui_drop_down("$text:Origin;list:Origin,Allied,Hostile,Neutral;")
+        # TODO: Spawn sides should always include ALL sides. So we not only need a way to update this list, we also need to dynamically generate it on startup.
+        # Current system is acceptable, assuming that all players are on the same side.
+        spawn_side_dropdown = gui_drop_down("$text:Origin;list:Origin,Allied,Hostile,Neutral;")
         gui_row("row-height: 1.5em;")
-        spawn_button = gui_button("$text:Spawn;justify:center;")
+        spawn_button = gui_button("$text:Spawn;justify:center;", data={"lb":lb, "spawn_side_dropdown": spawn_side_dropdown})
         on gui_message(spawn_button):
             print("Spawning test")
+            selection = lb.value
+            side_option = spawn_side_dropdown.value
+            if side_option == "Origin":
+                spawn_side = selection.get("origin","")
+            elif side_option == "Allied":
+                spawn_side = "tsn" # For now
+            elif side_option == "Hostile":
+                spawn_side = "raider" # For now
+            else:
+                spawn_side = "civilian"
+            spawn_roles = spawn_side + selection.get("roles","")
+            art = selection.get("artfileroot")
+
+            prefab_spawn(prefab_single_ship, data={"fleet_roles":spawn_roles, "ship_art": art, "side_value": spawn_side})
 
         on change len(selected_list):
             selected_origins = []
@@ -117,11 +133,12 @@ icon_index: 160
         
         gui_row("row-height: min-content;")
         gui_text("$text:Spawn Side:;justify:center;")
-        gui_drop_down("$text:Origin;list:Origin,Allied,Hostile,Neutral;")
+        spawn_side_dropdown = gui_drop_down("$text:Origin;list:Origin,Allied,Hostile,Neutral;")
         gui_row("row-height: 1.5em;")
         spawn_button = gui_button("$text:Spawn;justify:center;")
         on gui_message(spawn_button):
             print("Spawning test")
+            # prefab_spawn(prefab_npc)
 
         gui_row("row-height: 1em;")
         details = gui_text("$text:Details;","justify: center; background: #123456; click_text:; click_background: #012345;")
