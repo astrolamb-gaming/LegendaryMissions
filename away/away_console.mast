@@ -1,0 +1,360 @@
+# The away team's consoles - THE LEGACY PATH.
+#
+# RETIRED FOR ePADD MISSIONS. The PADD is the away UI now: you carry it down with you,
+# the Away Team app is the way there and back, and the beat plus its replies arrive in
+# Messages. Everything below runs only when `EPADD_ENABLED` is off, so a mission that
+# predates the PADD - or one that deliberately turns it off - keeps exactly the away
+# play it always had.
+#
+# The retirement is a CONDITION, not a deletion, for two reasons. ePADD is opt-in and a
+# mission with it off would otherwise have no away UI at all; and this file is the only
+# implementation of the shared main-screen view (`away_ui_main_screen`), which the PADD
+# model has no answer for - the main screen is the room's, not one person's, so it is
+# the one surface a personal device cannot replace.
+#
+# What replaced what:
+#
+#     away_ui_screen        -> the ePADD Away Team app + Messages
+#     away_ui_beam_up       -> away_go_up (library)
+#     //shared/signal/away_begin -> away_invite / away_invite_crew
+#     away_ui_watch         -> not needed: a late console opens Away Team and joins
+#
+#
+# Beaming down turns the bridge into a landing party: every console except the main
+# screen becomes ONE character, with that character's face, job and - the whole point -
+# that character's own menu. The main screen carries the shared view and takes nobody,
+# because one person's menu on everybody's screen is not a shared view.
+#
+# WHAT THIS ADDON OWNS: the screens, the morph, and the way home. Nothing else.
+#
+# WHAT IT DOES NOT OWN: the story. The mission decides which beats play and when, opens
+# one with `away_scene_begin(scenes, key, speaker=...)`, and then says:
+#
+#     signal_emit("away_begin", {"AWAY_SHIP": ship_id, "AWAY_ROSTER": roster})
+#
+# where `roster` is the list of lifeforms to hand out (`lifeforms_spawn` of an
+# `## Away Team` section), and an optional `AWAY_TITLE` names the place on the shared
+# view. Everything the consoles need after that is read from
+# `sbs_utils.procedural.away`, so a console that repaints for its own reasons lands on
+# the same beat as everyone else.
+#
+# Labels are `away_ui_*` on purpose. `away_*` without the ui is the LIBRARY's namespace
+# (away_scene_begin, away_choices, away_answer...), and a MAST label name is reserved
+# mission-wide - naming one `away_screen` would be a collision waiting for the first
+# mission that also wanted that name.
+
+
+#############################################################################
+# One console, one character.
+#############################################################################
+=== away_ui_screen
+    jump away_ui_beam_up if not away_is_open()
+
+    # THE ONE DOOR. Overlays, the viewscreen claim, the camera, every console role,
+    # CONSOLE_TYPE, the crew seat and the engine widget list - in the order that works.
+    # Idempotent on an unchanged type, so it costs nothing on the repaint this label does
+    # on every scene change.
+    gui_console_enter(client_id, "away")
+
+
+    # WHO THIS CONSOLE IS SHOWING. One at a time, even when it speaks for several: four
+    # characters' readings side by side is a dozen buttons and no sense of who is doing
+    # what. The roster listbox picks; this is the detail panel acting on that selection.
+    away_ui_held = away_held(client_id)
+    away_ui_active = get_inventory_value(client_id, "AWAY_ACTIVE", None)
+    if away_ui_active is None or away_ui_active not in away_ui_held:
+        # No pick yet, or the pick went stale - somebody else took that body over.
+        away_ui_active = away_me(client_id)
+        set_inventory_value(client_id, "AWAY_ACTIVE", away_ui_active)
+
+    away_ui_who = to_object(away_ui_active)
+    away_ui_name = "Observer"
+    away_ui_face = None
+    away_ui_job = "watching"
+    if away_ui_who is not None:
+        away_ui_name = away_ui_who.name
+        away_ui_face = get_face(away_ui_who.id)
+        # What this character is FOR - the scene guards read exactly these words. The
+        # filtering and sorting live in the library because every away mission needs
+        # them, and getting it wrong prints `medical, ultra_beam, amd_lifeform:sorel`.
+        away_ui_job = away_job_text(away_ui_who, default="watching")
+
+    # THE ROSTER, only when there is a choice to make. A console holding one character
+    # gets the whole width for that character - a one-row listbox is furniture that says
+    # nothing, and this screen is read at a glance across a room.
+    if len(away_ui_held) > 1:
+        gui_section("area:5,6,30,94;")
+        # `hint=` as well as `reveal=`, because this page repaints BECAUSE of its own
+        # selection. Reveal alone scrolls the pick into view but a rebuild starts at the
+        # top, so the row the crew clicked lands somewhere else under the mouse; the hint
+        # keeps it in the same slot. A stale hint is clamped, not an error.
+        away_ui_hint = get_inventory_value(client_id, "AWAY_ROSTER_HINT", None)
+        away_ui_roster_lb = gui_list_box(to_object_list(away_ui_held), "row-height: 3.2em;", item_template=away_ui_roster_row, title_template=away_ui_roster_title, select=True, reveal=True, hint=away_ui_hint)
+        away_ui_roster_lb.set_selected_index(away_ui_held.index(away_ui_active), False)
+        on change away_ui_roster_lb.value:
+            away_ui_picked = away_ui_roster_lb.get_value()
+            if away_ui_picked is not None:
+                set_inventory_value(client_id, "AWAY_ACTIVE", to_id(away_ui_picked))
+                set_inventory_value(client_id, "AWAY_ROSTER_HINT", away_ui_roster_lb.get_selection_hint())
+                jump away_ui_screen
+        gui_section("area:32,6,95,94;")
+    else:
+        gui_section("area:8,6,92,94;")
+
+    if away_ui_face is not None:
+        gui_row("row-height: 6em;")
+        gui_face(away_ui_face)
+
+    gui_row("row-height: 2.6em;")
+    gui_text("$text:`{away_ui_name}`;justify:center;font:gui-4")
+
+    gui_row("row-height: 1.6em;")
+    gui_text("$text:`{away_ui_job}`;justify:center;font:gui-2;color:#8cf")
+
+    gui_row("row-height: content;")
+    away_ui_said = away_line()
+    gui_text_area("{away_ui_said}")
+
+    gui_row("row-height: 1em;")
+    gui_blank()
+
+    # on_press= + data=, never an inline `on gui_message` block: a handler registered
+    # inside a for loop captures the loop variable at its LAST value, so every button
+    # would answer with the last index.
+    #
+    # `away_choices_for`, not a filter over `away_choices`: the shared choices are deduped
+    # onto the primary there, so filtering by tag would leave a second character with no
+    # way to say "beam back up".
+    away_ui_seq = away_seq()
+    for away_ui_i, away_ui_ch in enumerate(away_choices_for(client_id, away_ui_active)):
+        gui_row("row-height: 2.4em;")
+        away_ui_label = away_ui_ch.label
+        # The LABEL, plainly. Wrapped in a `$text:`...`;` style string the engine drew the
+        # BACKTICKS - they are a style-value quote, not a markup the renderer strips, so
+        # every choice on screen read `Ask her plainly what is in the shed` with the
+        # marks around it.
+        gui_button(away_ui_label, data={"pick_index": away_ui_i, "pick_seq": away_ui_seq, "pick_agent": away_ui_active}, on_press=away_ui_pick)
+
+    # The polled revision counter. A signal does NOT wake a task sitting in await gui(),
+    # and the symptom of getting this wrong is a choice that only appears when something
+    # else happens to rebuild the page.
+    on change away_seq():
+        jump away_ui_screen
+
+    await gui()
+
+
+# One console's pick. `away_answer` arbitrates: the seq this console RENDERED with comes
+# back with the press, so a second press in the same frame is already stale and refused.
+=== away_ui_pick
+    # `pick_agent`: the index is into the list this console RENDERED, which for a
+    # doubled-up console is one character's list, not the console's whole one. Without
+    # it the same index reads against a different list and presses the wrong thing.
+    away_answer(client_id, pick_index, pick_seq, agent=pick_agent)
+    ->END
+
+
+#############################################################################
+# The shared view. Where the team is, what was just said, and who is down there -
+# but no choices, because a choice belongs to one character.
+#############################################################################
+=== away_ui_main_screen
+    jump away_ui_beam_up if not away_is_open()
+
+    # FIRST: record where this main screen belongs, before anything assigns it away. A
+    # shot assigns the console to whatever the lens rides, and there is exactly one
+    # moment when its own ship is still knowable.
+    viewscreen_console_enter(client_id)
+    gui_console_enter(client_id, "mainscreen")
+    add_role(client_id, "away_watch")
+
+    gui_section("area:6,6,94,94;")
+
+    gui_row("row-height: 3em;")
+    away_ui_where = away_scene()
+    away_ui_title = get_inventory_value(client_id, "AWAY_TITLE", "AWAY TEAM")
+    gui_text("$text:`{away_ui_title} - {away_ui_where}`;justify:center;font:gui-5")
+
+    gui_row("row-height: content;")
+    away_ui_shared_said = away_line()
+    gui_text_area("{away_ui_shared_said}")
+
+    gui_row("row-height: 1em;")
+    gui_blank()
+
+    for away_ui_member in to_object_list(away_team()):
+        gui_row("row-height: 2em;")
+        away_ui_member_name = away_ui_member.name
+        gui_text("$text:`{away_ui_member_name}`;justify:center;font:gui-3")
+
+    on change away_seq():
+        jump away_ui_main_screen
+
+    await gui()
+
+
+#############################################################################
+# Back to the bridge. The console this client came from was recorded on the way down.
+#############################################################################
+=== away_ui_beam_up
+    away_ui_back = get_inventory_value(client_id, "AWAY_RETURN", "helm")
+    away_assign(client_id, None)
+    # The same door on the way back. It re-asserts the crew seat too - a seat is believed
+    # only while the client's CONSOLE_TYPE agrees with it, so the morph freed this
+    # person's post and their name and face would otherwise not come back.
+    gui_console_enter(client_id, away_ui_back)
+    # Not a console type, so the door does not know about it.
+    remove_role(client_id, "away_watch")
+    CONSOLE_SELECT = away_ui_back
+
+    # NOT everyone goes home through the ship console path. `common_console_show` opens
+    # with `jump select_console_clear_ready if _ship_id == 0 or not has_role(...)`, and
+    # the main screen is usually client 0 - the SERVER console, which has no ship. That
+    # drops it into the CLIENT console picker, whose `select_console` reads
+    # `console_select_item`, a task variable set in `client_main` that the server's GUI
+    # task never ran: a NameError and a dead screen, reported against this addon for a
+    # mistake in the caller.
+    jump show_main_game_screen if away_ui_back == "mainscreen"
+    away_ui_home_ship = sbs.get_ship_of_client(client_id)
+    jump show_main_game_screen if away_ui_home_ship == 0 or not has_role(away_ui_home_ship, "__player__")
+    jump common_console_show
+
+
+#############################################################################
+# Routes.
+#############################################################################
+
+# //shared/signal, not //signal: this hands out characters and morphs consoles, and with
+# six consoles a //signal body would do every bit of it six times over.
+#
+# The mission opens the beat FIRST (`away_scene_begin`) and then emits this, so the very
+# first build already has a line to draw.
+//shared/signal/away_begin if not gui_app_mode_is_on()
+    # `default`, because these arrive as task variables from the caller's data dict and
+    # the optional ones are simply ABSENT when nobody passed them - not None. Reading an
+    # absent name is a NameError, and a failing expression stops the command, so the
+    # whole hand-over died on the title line and no console morphed at all.
+    default AWAY_TITLE = None
+    default AWAY_SHIP = None
+    default AWAY_ROSTER = None
+    ->END if not away_is_open()
+    away_ui_ship = AWAY_SHIP if AWAY_SHIP is not None else next(iter(role("__player__")), None)
+    ->END if away_ui_ship is None
+    away_ui_roster = AWAY_ROSTER
+    ->END if away_ui_roster is None or len(away_ui_roster) == 0
+
+    # TWO PASSES, and the order is the point. `gui_reroute_client` ticks that client's
+    # GUI task in THIS frame, so a screen that draws the whole team must be built AFTER
+    # the team exists - rerouting as we assign meant the main screen (client 0, which
+    # sorts first) drew an empty roster and only filled in on the next beat.
+    # What the shared view calls this place. Carried in the hand-over data because the
+    # addon has no idea where the crew is - only the mission does.
+    away_ui_title = AWAY_TITLE if AWAY_TITLE is not None else "AWAY TEAM"
+    away_ui_seats = []
+    for away_ui_cid in sorted(linked_to(away_ui_ship, "consoles")):
+        set_inventory_value(away_ui_cid, "AWAY_RETURN", get_inventory_value(away_ui_cid, "CONSOLE_TYPE", "helm"))
+        set_inventory_value(away_ui_cid, "AWAY_TITLE", away_ui_title)
+        # The main screen is the whole room's view, so it takes no character.
+        continue if has_role(away_ui_cid, "mainscreen")
+        away_ui_seats.append(away_ui_cid)
+
+    # DEAL THE WHOLE ROSTER, rather than giving each console the character at its own
+    # index. Indexing by console left every character past the last console unplayed -
+    # standing on the surface, in nobody's away_team(), with the readings only they could
+    # take unreachable - and the modulo that wrapped it handed TWO consoles the same
+    # person once there were more consoles than characters. Dealing fixes both ends: a
+    # short party doubles up, a large one leaves the surplus consoles to the watcher.
+    away_ui_slot = 0
+    for away_ui_member in away_ui_roster:
+        break if len(away_ui_seats) == 0
+        away_ui_seat = away_ui_seats[away_ui_slot % len(away_ui_seats)]
+        if away_ui_slot < len(away_ui_seats):
+            away_assign(away_ui_seat, away_ui_member)
+        else:
+            away_assign_also(away_ui_seat, away_ui_member)
+        away_ui_slot += 1
+
+    for away_ui_cid in sorted(linked_to(away_ui_ship, "consoles")):
+        if has_role(away_ui_cid, "mainscreen"):
+            # The orbit shot is the SHIP's claim, not this console's, so the door leaves
+            # it alone - a bare owner ("docking") outlives one console moving. Deciding
+            # the orbit is over is the away mission's call.
+            viewscreen_restore(away_ui_ship)
+            gui_reroute_client(away_ui_cid, away_ui_main_screen)
+            continue
+        gui_reroute_client(away_ui_cid, away_ui_screen)
+    # Remembered so a console that connects LATE can still be given somebody.
+    set_inventory_value(away_ui_ship, "AWAY_ROSTER", away_ui_roster)
+    set_inventory_value(away_ui_ship, "AWAY_TITLE", away_ui_title)
+    task_schedule(away_ui_watch, {"AWAY_SHIP": away_ui_ship})
+    log(f"away: scene={away_scene()} seats={len(away_ui_seats)} characters={away_ui_slot}", "away")
+    ->END
+
+
+#############################################################################
+# Late arrivals.
+#
+# A console that connects, or changes station, AFTER the team has beamed down was
+# never in the loop above - it lands on its ordinary bridge console while the rest of
+# the ship is on the ground, and there is no way for it to join. Polled once a second
+# rather than hung off a hook because there is no hook that fits: `//console/change` is
+# the change-console BUTTON and LegendaryMissions already owns it.
+#
+# Self-terminating: the watcher ends with the scene.
+#############################################################################
+=== away_ui_watch
+--- away_ui_watch_loop
+    await delay_sim(1)
+    ->END if not away_is_open()
+    ->END if not object_exists(AWAY_SHIP)
+    away_ui_late_roster = get_inventory_value(AWAY_SHIP, "AWAY_ROSTER", None)
+    for away_ui_late in sorted(linked_to(AWAY_SHIP, "consoles")):
+        # Already somebody, or already watching. Nothing owed.
+        continue if away_me(away_ui_late) is not None
+        continue if has_role(away_ui_late, "away_watch")
+        set_inventory_value(away_ui_late, "AWAY_RETURN", get_inventory_value(away_ui_late, "CONSOLE_TYPE", "helm"))
+        set_inventory_value(away_ui_late, "AWAY_TITLE", get_inventory_value(AWAY_SHIP, "AWAY_TITLE", "AWAY TEAM"))
+        # A free character if there is one; otherwise TAKE ONE OVER from a console that
+        # is doubled up. A latecomer should relieve a short-handed crew, not sit and
+        # watch while somebody else speaks for three people. The shared view is the
+        # fallback only when nobody has a spare - and it is never a second copy of
+        # somebody: two consoles answering as one person is worse than a console with
+        # nothing to answer.
+        away_ui_free = None
+        if away_ui_late_roster is not None and not has_role(away_ui_late, "mainscreen"):
+            for away_ui_cand in away_ui_late_roster:
+                if to_id(away_ui_cand) not in away_team():
+                    away_ui_free = away_ui_cand
+                    break
+            if away_ui_free is None:
+                for away_ui_busy in sorted(away_clients()):
+                    away_ui_holds = away_held(away_ui_busy)
+                    if len(away_ui_holds) > 1:
+                        # The LAST one it picked up, so a console keeps the character
+                        # whose face it has been showing all along.
+                        away_ui_free = away_ui_holds[-1]
+                        away_ui_keep = away_ui_holds[:-1]
+                        away_assign(away_ui_busy, away_ui_keep[0])
+                        for away_ui_extra in away_ui_keep[1:]:
+                            away_assign_also(away_ui_busy, away_ui_extra)
+                        gui_reroute_client(away_ui_busy, away_ui_screen)
+                        break
+        if away_ui_free is None:
+            gui_reroute_client(away_ui_late, away_ui_main_screen)
+        else:
+            away_assign(away_ui_late, away_ui_free)
+            gui_reroute_client(away_ui_late, away_ui_screen)
+        log(f"away: console {away_ui_late} joined late", "away")
+    jump away_ui_watch_loop
+
+
+#############################################################################
+# The legacy away console as a tab. Gone in ePADD mode - the PADD is the away
+# UI there, and leaving this registered put a second, competing away screen one
+# button away from the one the crew are actually using.
+#
+# Not an @console/away either way: it must not appear in the console picker - a
+# player does not choose to be on the surface, a mission puts them there.
+#############################################################################
+//gui/tab/away if not gui_app_mode_is_on()
+    jump away_ui_screen
