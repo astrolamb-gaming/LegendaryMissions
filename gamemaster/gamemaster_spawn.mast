@@ -2,16 +2,17 @@
     # This shoudn't actually do anything. It's mostly here to prevent `gm_menu_spawn` from running immediately on startup without being attached to a gui.
     ->END
 
-=== gm_menu_spawn
+=== gm_menu_spawn_ships
 metadata: ``` yaml
-type: gm_menu/spawn
-icon_index: 156
+type: gm_menu/ships
+icon_index: 140
 icon_color: "blue"
 priority: 20 # Smaller number is higher priority
 ```
     
     data = gm_get_origins_sides_roles()
     origins = data.get("origins")
+    origins = sorted(origins, key=str.casefold)
     roles = data.get("roles")
     # NOTE: Sides that are defined in shipData may not be initialized in-game!!
     sides = data.get("sides")
@@ -22,8 +23,8 @@ priority: 20 # Smaller number is higher priority
         #     gui_text("$text:Origins;justify:center;")
         origins_text = gm_spawn_type_button("$text:Origins;justify:center;", "background: #012223;")
         origins_row = gui_row("row-height: min-content;")
-        selected_style = "click_background: #190182;click_text:; background: #1234566b;border: 0px; border-color: #00000000;"
-        unselected_style = "click_background: #190182;click_text:; background: #111555;border: 1px;border-color: #349c9c;"
+        selected_style = "click_background: #190182;click_text:; background: #215487;border: 2px; border-color: #349c9c;"
+        unselected_style = "click_background: #190182;click_text:; background: #111555;border: 0px;"
         selected_list = list()
         with gui_sub_section("row-height: 1.5em;"):
             with gui_grid(3):
@@ -40,101 +41,102 @@ priority: 20 # Smaller number is higher priority
                         else:
                             selected_list.append(__ITEM__)
                             layout_item_update_style(__ITEM__, selected_style)
-        
-        origins_visible = True
+            gui_row()
         # on gui_click(origins_text):
         on gui_message(origins_text):
-            print("Message triggered")
-            if origins_visible:
-                gui_hide(origins_row)
-                origins_visible = False
-            else:
+            if origins_row.is_hidden_by_script:
                 gui_show(origins_row)
-                origins_visible = True
-
-
-        
-        gui_row("row-height: 1em;")
-        with gui_sub_section("click_background: #5555;click_text:; background: #1234566b;") as role_button:
-            gui_row("row-height: 1em;")
-            gui_text("$text:Roles;justify:center;")
-        
-        role_row = gui_row("row-height: min-content;")
-        with gui_sub_section("row-height: 1em;"):
-            with gui_grid(3):
-                for r in roles:
-                    gui_text(r)
-
-        roles_visible = True
-        on gui_message(role_button):
-            if roles_visible:
-                gui_hide(role_row)
-                roles_visible = False
             else:
-                gui_show(role_row)
-                roles_visible = True
+                gui_hide(origins_row)
 
-        gui_row("row-height: 1em;color: #111555")
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Spawn Side (relative to players):;")
-        gui_drop_down("$text:Origin;list:Origin,Allied,Hostile,Neutral")
-        gui_row("row-height: content;")
+        # A hopefully temporary row to account for a bug in gui_grid.
+        # See https://github.com/artemis-sbs/LegendaryMissions/issues/724
+        gui_row("row-height: 1em;")
+        gui_blank()
+        gui_row("row-height: 2px; background: #000000")
+        gui_blank()
+        gui_row("row-height: max-content;")
 
-        items = []
-        items.append("Test")
-        items.append("Test2")
-
-        
-        items = filter_ship_data_generically("tsn")
+        items = filter_ship_data_generically("", required_roles=["ship"])
         lb = gui_list_box(items, "", select=True, item_template=gm_ship_spawn_select_template)
+        gui_row("row-height: min-content;")
+        gui_text("$text:Spawn Side:;justify:center;")
+        gui_drop_down("$text:Origin;list:Origin,Allied,Hostile,Neutral;")
         gui_row("row-height: 1.5em;")
-        spawn_button = gui_button("Spawn")
+        spawn_button = gui_button("$text:Spawn;justify:center;")
         on gui_message(spawn_button):
             print("Spawning test")
 
+        on change len(selected_list):
+            selected_origins = []
+            for selected_item in selected_list:
+                selected_origins.append(selected_item.data.get("origin"))
+            items = filter_ship_data_generically("", required_origin=selected_origins, required_roles=["ship"])
+            lb.items = items
+            # gui_represent(lb)
 
 
+        gui_row("row-height: 1em;")
+        details = gui_text("$text:Details;","justify: center; background: #123456; click_text:; click_background: #012345;")
+        details_row = gui_row("row-height: content;")
+        details_text = gui_text("$text: No item selected.")
+        on change lb.value:
+            item = lb.value
+            desc = item.get("long_desc","No description found.")
+            details_text.update(f"$text: {desc}")
         
-            
+        on gui_message(details):
+            if details_row.is_hidden_by_script:
+                gui_show(details_row)
+            else:
+                gui_hide(details_row)
         
-    
-
-    # debug_print("Spawn - this should not appear")
-    # gui_button("Testing Spawn", f"color: {icon_color}")
-    # gui_row()
-    # gui_blank()
     yield success
 
 
-=== gm_menu_spawn_ships
+=== gm_menu_spawn_ships_search
 metadata: ```
-type: gm_menu/spawn/ships
-icon_index: 140
+type: gm_menu/ships/search
+icon_index: 160
 ```
-    gui_row("row-height: 1.5em;")
-    filt = gui_input("$text:light;")
-    gui_row()
+    with gui_sub_section("row-height: content; background: #000444;"):
+        gui_row("row-height: 1.5em;")
+        filt = gui_input("$text:;")
 
-    ship_list = filter_ship_data_generically(filt.value)
-    print(f"Ship list length: {len(ship_list)}")
+        ship_list = filter_ship_data_generically(filt.value, required_roles=["ship"])
+        print(f"Ship list length: {len(ship_list)}")
 
-    list_box = gui_list_box(ship_list, "", item_template=gm_ship_spawn_select_template, select=True)
+        gui_row("row-height: max-content;")
 
-    on change filt.value:
-        print("New value: {filt.value}")
-        ship_list = filter_ship_data_generically(filt.value)
-        list_box.items = ship_list
+        items = filter_ship_data_generically("", required_roles=["ship"])
+        lb = gui_list_box(items, "", select=True, item_template=gm_ship_spawn_select_template)
+        
+        on change filt.value:
+            items = filter_ship_data_generically(filt.value, required_roles=["ship"])
+            lb.items = items
+        
+        gui_row("row-height: min-content;")
+        gui_text("$text:Spawn Side:;justify:center;")
+        gui_drop_down("$text:Origin;list:Origin,Allied,Hostile,Neutral;")
+        gui_row("row-height: 1.5em;")
+        spawn_button = gui_button("$text:Spawn;justify:center;")
+        on gui_message(spawn_button):
+            print("Spawning test")
 
-    # This row shows additional details for the selected ship
-    gui_row()
-    gui_text(f"Details here....")
-
-    # Spawn row
-    gui_row("row-height: 1.5em;")
-    spawn_button = gui_button("Spawn")
-    on gui_message(spawn_button):
-        sel = list_box.get_selected()
-        print(f"Spawning: {sel.get('art_id')}")
+        gui_row("row-height: 1em;")
+        details = gui_text("$text:Details;","justify: center; background: #123456; click_text:; click_background: #012345;")
+        details_row = gui_row("row-height: content;")
+        details_text = gui_text("$text: No item selected.")
+        on change lb.value:
+            item = lb.value
+            desc = item.get("long_desc","No description found.")
+            details_text.update(f"$text: {desc}")
+        
+        on gui_message(details):
+            if details_row.is_hidden_by_script:
+                gui_show(details_row)
+            else:
+                gui_hide(details_row)
 
 
     yield success

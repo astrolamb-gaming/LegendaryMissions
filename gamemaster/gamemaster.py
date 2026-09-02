@@ -18,7 +18,7 @@ from sbs_utils.procedural.gui.dropdown import gui_drop_down
 from sbs_utils.procedural.comms import comms_broadcast
 from sbs_utils.procedural.roles import role
 from sbs_utils.procedural.gui import gui_task_for_client, gui_region
-from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type, gui_get_variable, AWAIT
+from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type, gui_get_variable, AWAIT, gui_set_variable
 
 
 def gamemaster_show_nav_area(ORIGIN_ID, pos, size_delta, text, selection_type, color):
@@ -274,48 +274,76 @@ def gm_get_origins_sides_roles() -> dict:
 
 
 
-def filter_ship_data_generically(text):
+def filter_ship_data_generically(text, required_roles=None, required_origin=None, required_side=None):
     """
-    Filters ship data for any usage of the provided text. Includes name, origin, side, roles, and description.
+    Filters ship data by search text and optional ship-data requirements.
+
+    Each whitespace-separated search term must match somewhere in the key,
+    name, origin, side, roles, or description.
+    Every required role must be present. Origin and side requirements are
+    matched case-insensitively after surrounding whitespace is removed.
+
     Args:
         text (str): The text for which to search.
-    
+        required_roles (str | iterable[str] | None): Roles every result must have.
+        required_origin (str | None): Origin every result must have.
+        required_side (str | None): Side every result must have.
+
     Returns:
-        list: The list of ship keys
-    
+        list: The matching ship data dictionaries.
+
     """
     data = get_ship_data()
     if data is None:
         return []
 
-    if text is None:
-        text = ""
-    needle = str(text).strip().lower()
+    def normalize_requirement(value):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        return [str(item).strip().lower() for item in value if str(item).strip()]
 
-    # Blank search returns all known ship keys in load order.
-    if needle == "":
-        return [ship for ship in data.get("#ship-list", []) if ship.get("key")]
+    needle = "" if text is None else str(text).strip().lower()
+    search_terms = needle.split()
+    required_roles = normalize_requirement(required_roles)
+    required_origin = normalize_requirement(required_origin)
+    required_side = normalize_requirement(required_side)
 
     results = []
     for ship in data.get("#ship-list", []):
-        key = ship.get("key", "")
-        name = ship.get("name", "")
-        origin = ship.get("origin", "")
-        side = ship.get("side", "")
-        roles = ship.get("roles", "")
-        long_desc = ship.get("long_desc", "")
+        if not ship.get("key"):
+            continue
+
+        key = str(ship.get("key", ""))
+        name = str(ship.get("name", ""))
+        origin = str(ship.get("origin", ""))
+        side = str(ship.get("side", ""))
+        roles = str(ship.get("roles", ""))
+        long_desc = str(ship.get("long_desc", ""))
+
+        ship_origin = origin.strip().lower()
+        ship_side = side.strip().lower()
+        ship_roles = {role.strip().lower() for role in roles.split(",") if role.strip()}
+
+        if required_origin and ship_origin not in required_origin:
+            continue
+        if required_side and ship_side not in required_side:
+            continue
+        if not all(role_name in ship_roles for role_name in required_roles):
+            continue
 
         # Join all the text into one string
         haystack = "|".join([
-            str(key),
-            str(name),
-            str(origin),
-            str(side),
-            str(roles),
-            str(long_desc)
+            key,
+            name,
+            origin,
+            side,
+            roles,
+            long_desc
         ]).lower()
 
-        if needle in haystack:
+        if all(term in haystack for term in search_terms):
             results.append(ship)
 
     return results
@@ -328,38 +356,63 @@ def layout_item_update_style(item, style):
     item.mark_layout_dirty()
 
 def gm_ship_spawn_select_template(item):
-    gui_row("padding:13px;")
+    # gui_row("padding:13px;")
     # print(f"{item}")
-    if item is None:
-        print("Item is None!")
-    else:
-        print(item)
-    art = item.get("art_id", "")
-    # gui_ship(f"{art}", style="col-width:50px;padding:0,0,5px,0;")
-    dat = get_ship_data_for(art)
-    desc = "A fine ship"
-    roles = "No roles found"
-    if dat is not None:
-        desc = dat.get("name")
-        origin = dat.get("origin")
-        if origin is not None:
-            desc = f"{origin} - {desc}"
+    ss = gui_get_variable("set_string")
+    if not ss:
+        if item is None:
+            print("Item is None!")
         else:
-            desc = f"{desc}"
-        roles = dat.get("roles",roles)
+            print(item)
+        gui_set_variable("set_string",True)
+    art = item.get("artfileroot", "")
+    key = item.get("key","")
+    # gui_ship(f"{art}", style="col-width:50px;padding:0,0,5px,0;")
+    dat = get_ship_data_for(key)
+    name = "Unknown ship"
+    origin = "Unknown origin"
+    roles = "No roles found"
+    long_desc = "Description"
+    if dat is not None:
+        name = dat.get("name") or name
+        origin = dat.get("origin") or origin
+        roles = dat.get("roles") or roles
+        roles = ", ".join(roles.split(","))
+        long_desc = dat.get("long_desc") or long_desc
     else:
         print(f"data is None for {art}")
-
-    with gui_sub_section():
+    name = gui_text_escape(str(name)).strip()
+    origin = gui_text_escape(str(origin)).strip()
+    roles = gui_text_escape(str(roles)).strip()
+    long_desc = gui_text_escape(str(long_desc)).strip()
+    # gui_row("row-height: min-content;")
+    # gui_row()
+    # with gui_sub_section("row-height: min-content;"):
         # gui_row("row-height:1em;")
         # # Escape the user-entered ship name so a ':' or ';' in it can't inject
         # # style properties or break the justify/font that follow (issue #569).
         # ship_label = gui_text_escape(f"{item.name} - {item.side}")
         # gui_text(f"$text:{ship_label};justify: left;font:gui-3;")
+    gui_row("row-height: 3em;")
+    # Explicit col-width on both sides: unset columns default to a 1fr/1fr
+    # split, not to their natural size, so the ship render and the text
+    # column need their share stated here.
+    # with gui_sub_section(style="col-width: 30px;"):
+    #     gui_ship(f"$type:{art};angle:45;")
+    with gui_sub_section("padding: 2px;"):
         gui_row("row-height:1em;")
-        gui_text(f"$text:{desc};justify: left;font:gui-2;color:#bbb;")
-        gui_row("row-height: 1em;")
-        gui_text(f"$text: {roles};")
+        gui_text(f"$text:{name};justify: left;font:gui-2;color:#bbb;", "col-width: content;")
+        # gui_row("row-height: 1em;")
+        gui_blank()
+        gui_text(f"$text:{origin};","col-width: content;")
+        gui_row("row-height: 2em;")
+        gui_text(f"$text:Roles: {roles};")
+        # row-height: min-content falls back to flex inside a listbox item
+        # template (content-sizing keywords don't hug content there), so an
+        # unstyled row does the same thing without implying it measures.
+        # gui_row()
+        # gui_text(f"$text:{long_desc}","overflow: shrink;")
+
 
 
 _SYSTEM_INDEX_NAMES = {
