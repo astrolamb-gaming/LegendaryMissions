@@ -619,6 +619,7 @@ def gm_selected_fleet_data(obj_id):
             "type": ship_type,
             "origin": origin,
             "roles": roles,
+            "side":_side
         })
 
     ships.sort(key=lambda item: str(item.get("name", "")).lower())
@@ -631,13 +632,16 @@ def gm_selected_fleet_ship_template(item):
     ship_type = gui_text_escape(str(item.get("type", "unknown")))
     origin = gui_text_escape(str(item.get("origin", "unknown")))
     roles = gui_text_escape(str(item.get("roles", "none")))
+    side = gui_text_escape(str(item.get("side","unknown")))
 
     gui_row("row-height: 3.5em;")
     with gui_sub_section():
         gui_row("row-height: 1.2em;")
-        gui_text(f"$text:{name};font:gui-2;color:#bbb; col-width:content;")
+        gui_text(f"$text:{name};font:gui-2;color:#bbb;","col-width:content;")
         gui_blank()
-        remove_button = gui_text(f"$text:X;","click_background: red; click_text:; col-width: content;")
+        gui_text(f"$text:{side};","col-width: content;")
+        gui_blank()
+        remove_button = gui_text(f"$text:X;","click_background: red; click_text:;col-width: content;")
         gui_row("row-height: 1.1em;")
         gui_text(f"$text:Type: {ship_type}  Origin: {origin};")
         gui_row("row-height: 1.1em;")

@@ -256,6 +256,7 @@ priority: 110
     ship_id = ship_data.get("ship_id") if ship_data is not None else None
     if ship_id is not None:
         fleet_remove_ship(ship_id)
+        await task_schedule(build_new_fleet_for_ship,{"ship_id":ship_id})
         fleet_list = gui_get_variable("gm_selected_fleet_list")
         gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
         selected = get_inventory_value(gm, "gamemaster_prev_selection", None)
@@ -265,4 +266,20 @@ priority: 110
             gui_represent(fleet_list)
     yield success
 
+
+
+=== build_new_fleet_for_ship
+metadata: ```yaml
+ship_id:
+```
+    yield fail if ship_id is None
+    old_fleet = get_inventory_value(ship_id, "my_fleet_id")
+    fleet_remove(old_fleet, ship_id)
+
+    pos = get_pos(ship_id)
+    role_list = get_role_string(ship_id)
+    
+    fleet = fleet_spawn(pos, role_list)
+    fleet.side = to_object(old_fleet).side
+    fleet_add(fleet, ship_id)
 
