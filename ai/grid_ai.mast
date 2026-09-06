@@ -360,13 +360,12 @@ default shared grid_data = grid_get_grid_data()
     ->END if hm is None
 
     #
-    # Get the points at this location
+    # The idle-room boost (sickbay/gym/mess/quarters) lives in the brain now:
+    # `ai_idle_at_room` in ai/grid_brains.mast, driven by the room table in
+    # `prefab_lifeform_damcons`. This label kept a second, diverging copy of the
+    # same rule - and it was unreachable anyway, since `damcon_ai` ->ENDs above
+    # while NEW_DAMCONS is true.
     #
-    at_point = hm.get_objects_at_point(x,y)
-
-    for id in at_point:
-        grid_damcons_handle_idling_boost(SPAWNED_ID, id)
-
     jump loop_damcons_ai
 
 

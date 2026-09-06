@@ -20,7 +20,6 @@
         any_damage = to_grid_object(grid_closest(UPGRADE_AGENT_ID, damaged_here))
     ->END if any_damage is None
     grid_repair_grid_objects(UPGRADE_AGENT.host_id, any_damage.id, UPGRADE_AGENT_ID)
-    # grid_damcons_handle_idling_boost_finish(UPGRADE_AGENT)
     # Remove work order. grid_repair_grid_objects on the line above already closed
     # the order for EVERY team on it; this covers the case where the node was not
     # actually damaged any more and the repair was a no-op.
@@ -35,15 +34,30 @@
 metadata: ``` yaml
 type: upgrade/damcons
 ```
+    # GUARD FIRST, THEN HEAL. `ai_idle_at_room` enters the sick bay on proximity alone -
+    # it has no HP test - so refusing an uninjured team is this label's job.
+    #
+    # This used to read `hp += 1` and then `yield success if hp==max_hp`, which is the same
+    # guard one line too late: it fired on the exact tick that would have COMPLETED the heal,
+    # returning before `grid_set_hp` ever ran. A team that had taken a single hit therefore
+    # healed nothing at all, ever, and a team that had taken several stopped one point short -
+    # so "fully recovered" was never broadcast, the icon color was never restored, and
+    # Engineering said "visit sickbay" forever.
+    #
+    # The wrap below it was the other half: an uninjured team reached hp 7, and 7 % 7 == 0
+    # wrote it to ZERO HP. `grid_set_hp` emits `life_form_hp_changed`, whose route scales
+    # move_speed by HP as a MULTIPLICATIVE modifier, so a healthy team that wandered through
+    # the sick bay also dropped to a seventh of its speed.
+    #
+    # `min()` rather than `%` because a clamp cannot wrap; the guard makes it belt-and-braces.
+    # The ceiling is the library's, so `grid_set_max_hp()` reaches here the way it already
+    # reaches the console and `grid_restore_damcons`. HP_MAX stays as a per-team override.
     hp = get_inventory_value(UPGRADE_AGENT_ID, "HP", 0)
-    max_hp = get_inventory_value(UPGRADE_AGENT_ID, "HP_MAX", 6)
-    # hp = min(HP_MAX, hp+1)
-    # set_inventory_value(AGENT_ID, "HP", hp)
-    hp += 1
-    yield success if hp==max_hp
+    max_hp = get_inventory_value(UPGRADE_AGENT_ID, "HP_MAX", grid_get_max_hp())
+    yield success if hp >= max_hp
 
+    hp = min(hp+1, max_hp)
     ship = UPGRADE_AGENT.host_id # obj defined in previous labels
-    hp %= (max_hp+1)
     grid_set_hp(ship, UPGRADE_AGENT_ID, hp)
 
     if hp < max_hp:
@@ -51,7 +65,12 @@ type: upgrade/damcons
         # Allow it to go again
         start_counter(UPGRADE_AGENT_ID, "idle_boost_counter")
     else:
-        color = get_inventory_value(BRAIN_AGENT_ID, "color", "purple")
+        # UPGRADE_AGENT_ID, not BRAIN_AGENT_ID: an upgrade task is handed UPGRADE_AGENT*,
+        # and BRAIN_AGENT_ID is simply not in scope here - reading it raises NameError,
+        # which STOPS the command, so the color restore and the broadcast below it never
+        # happen. It went unseen because this branch was unreachable until the heal above
+        # it was fixed to actually complete.
+        color = get_inventory_value(UPGRADE_AGENT_ID, "color", "purple")
         go_blob = to_blob(UPGRADE_AGENT_ID)
         if go_blob is not None:
             go_blob.set("icon_color", color)
