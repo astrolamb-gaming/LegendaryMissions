@@ -302,8 +302,20 @@ room: ""
     idle_pos = get_inventory_value(BRAIN_AGENT_ID, "blackboard:idle_pos")
     yield fail if _pos is None
     # Have we reached it
+    #
+    # ARRIVAL IS BEING THERE, not path_length reading 0. That value is 0 for three
+    # different things and only one of them is arrival: the mock says so itself
+    # (`_grid_remaining` returns None when there is NO ROUTE, written to the blob as
+    # 0), and it is also 0 before the engine has processed the move command.
+    #
+    # Without the position check a team that cannot reach its target - or has only
+    # just been told to go - latches idle_pos to a cell it is not standing in, and
+    # from the next tick every run fails on `_pos == idle_pos`. It holds the work
+    # order and never walks to it: move_to_work_order SUCCESS, move_to_location FAIL,
+    # forever, for a tune or a repair alike.
     length = BRAIN_AGENT.data_set.get("path_length",0)
-    if prev_pos is not None and length is not None and length < 0.01:
+    here = (BRAIN_AGENT.data_set.get("curx",0), BRAIN_AGENT.data_set.get("cury",0))
+    if prev_pos is not None and length is not None and length < 0.01 and here == _pos:
         set_inventory_value(BRAIN_AGENT_ID, "blackboard:prev_target_pos", None)
         set_inventory_value(BRAIN_AGENT_ID, "blackboard:idle_pos", _pos)
         BRAIN_AGENT.set_inventory_value("idle_state", "stopped")

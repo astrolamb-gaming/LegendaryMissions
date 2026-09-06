@@ -170,5 +170,41 @@ class MoveToLocationBranches(unittest.TestCase):
         self.assertEqual(state, "stopped")
 
 
+class ArrivalNeedsToBeThere(MoveToLocationBranches):
+    """`path_length` reads 0 for THREE different things, and only one is arrival.
+
+    The mock says so itself (`_grid_remaining`: "or None when there is no route",
+    written to the blob as 0), and the same is true before the engine has processed a
+    move command. So a team that CANNOT reach its target, or has only just been told
+    to go, reads exactly like a team standing on it.
+
+    That is how a team gets stuck holding a work order it never walks to: the arrival
+    branch latches idle_pos to a cell the team is not standing in, and from the next
+    tick on `_pos == idle_pos` fails forever. The brain tree shows
+    ai_lifeform_move_to_work_order SUCCESS followed by ai_lifeform_move_to_location
+    FAIL, over and over.
+    """
+
+    def test_a_team_that_is_NOT_at_the_target_has_not_arrived(self):
+        state = self._run((2, 2), target=(9, 9), idle_pos=None, prev_pos=(9, 9),
+                          idle_state="moving", path_length=0)
+        self.assertEqual(state, "moving",
+                         "a team standing at (2,2) cannot have arrived at (9,9)")
+
+    def test_it_does_not_latch_idle_pos_to_a_cell_it_is_not_in(self):
+        self._run((2, 2), target=(9, 9), idle_pos=None, prev_pos=(9, 9),
+                  idle_state="moving", path_length=0)
+        self.assertNotEqual(
+            get_inventory_value(self.team.id, "blackboard:idle_pos"), (9, 9),
+            "idle_pos was set to a cell the team never reached, which makes every "
+            "later tick fail on _pos == idle_pos")
+
+    def test_arriving_where_it_actually_IS_still_reports_stopped(self):
+        """The real arrival must keep working."""
+        state = self._run((9, 9), target=(9, 9), idle_pos=None, prev_pos=(9, 9),
+                          idle_state="moving", path_length=0)
+        self.assertEqual(state, "stopped")
+
+
 if __name__ == "__main__":
     unittest.main()
