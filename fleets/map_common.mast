@@ -3,6 +3,9 @@
 
 //shared/signal/game_started
     start_npc_cag()
+    # Reap Fleet agents whose last member is dead. A Fleet is an Agent, not a space
+    # object, so nothing else ever frees one - see fleet_purge_empty in fleet.py.
+    fleet_reap_start()
 
 
 =========== spawn_friendly_npc ===========

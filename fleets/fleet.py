@@ -1,8 +1,10 @@
 
 from sbs_utils.agent import Agent, get_story_id
-from sbs_utils.procedural.execution import get_variable
+from sbs_utils.procedural.execution import get_variable, task_schedule, jump, AWAIT
 from sbs_utils.procedural.query import to_object, to_id
 from sbs_utils.procedural.links import link, unlink
+from sbs_utils.procedural.brain import brain_clear
+from sbs_utils.procedural.timers import delay_sim
 
 
 from sbs_utils.helpers import FrameContext
@@ -72,6 +74,22 @@ class Fleet(Agent):
         
         #task_schedule(self.tick)
 
+
+    @property
+    def was_populated(self):
+        """True once this fleet has held at least one member ship.
+
+        A Fleet is an Agent, not a space object, so nothing reaps it when its last
+        member dies - that is what `fleet_purge_empty` is for. But "zero live members"
+        alone cannot tell an emptied fleet from one that is still being FILLED
+        (`prefab_fleet_empty` spawns a fleet and the mission adds ships afterwards,
+        possibly frames later).
+
+        The link COLLECTION is created by the first `link(fleet,"ship_list",...)` and
+        survives being emptied, so its presence - not its size - is the discriminator.
+        This is the one place that reaches into `links.collections` for it.
+        """
+        return "ship_list" in self.links.collections
 
     def get_best_anger(self):
         sim = FrameContext.sim
@@ -183,6 +201,119 @@ def fleet_remove(fleet_id, npc_id):
     set_inventory_value(npc_id, "my_fleet_id", None)
     unlink(fleet_id,"ship_list", npc_id)
     
+
+
+#--------------------------------------------------------------------------------------
+# Reaping empty fleets
+#
+# A Fleet is a class-level Agent (Agent.all), NOT a space object, so `delete_object`
+# never touches one and `object_exists(fleet_id)` is False for a perfectly live fleet.
+# Nothing garbage-collected an orphaned Fleet, so a long mission that spawns waves - or
+# the per-ship "ship_fleet" the GM makes, or the fleet-of-one every basic enemy prefab
+# builds - accumulated dead Fleet agents forever: a slow leak plus stale entries in
+# every `role("fleet")` walk and in the brain registry (each fleet carries a brain that
+# went on ticking with nothing to command).
+#
+# A fleet carrying the "fleet_persist" role is never reaped - the opt-out for a mission
+# that deliberately keeps an empty fleet handle around to refill later.
+#--------------------------------------------------------------------------------------
+
+FLEET_PERSIST_ROLE = "fleet_persist"
+
+# How often the sweep runs, in sim seconds. A fleet outliving its last member by a few
+# seconds costs nothing; the point is that it does not outlive it forever.
+FLEET_REAP_INTERVAL = 5
+
+
+def fleet_live_members(fleet_id_or_obj):
+    """Live member ids of a fleet, culling dead ones from the ship_list link.
+
+    `delete_object` purges a dead object as a link OWNER but leaves incoming links, so
+    a destroyed member stays in the raw ship_list as a dangling id. This resolves each
+    one and drops the ids that no longer resolve, which is the same cull
+    `ai_fleet_init_blackboard` does - done here too so a fleet with no brain (or one
+    whose brain never runs again) still gets tidied.
+    """
+    fleet = to_object(to_id(fleet_id_or_obj))
+    if fleet is None:
+        return []
+    live = []
+    for member_id in fleet.get_link_list("ship_list"):
+        if to_object(member_id) is None:
+            fleet.remove_link("ship_list", member_id)
+        else:
+            live.append(member_id)
+    return live
+
+
+def fleet_destroy(fleet_id_or_obj):
+    """Remove a Fleet agent from the story. Returns True if one was removed.
+
+    Safe to call on a fleet that still has live members - they are released (their
+    `my_fleet_id` back-reference cleared) rather than left pointing at a dead id.
+    """
+    fleet_id = to_id(fleet_id_or_obj)
+    fleet = to_object(fleet_id)
+    if not isinstance(fleet, Fleet):
+        return False
+
+    for member_id in fleet.get_link_list("ship_list"):
+        if get_inventory_value(member_id, "my_fleet_id", None) == fleet_id:
+            set_inventory_value(member_id, "my_fleet_id", None)
+    fleet.remove_link_all("ship_list")
+    fleet.anger_dict = {}
+    # Stop the behavior tree before the agent goes. Agent.remove_id purges the
+    # class-level `__BRAIN__` inventory mirror anyway (that mirror IS the brain tick
+    # loop's registry), so this is belt-and-braces - and it drops the Brain tree's own
+    # reference to the agent.
+    brain_clear(fleet_id)
+    Agent.remove_id(fleet_id)
+    return True
+
+
+def fleet_purge_empty():
+    """Reap every fleet whose last member is gone. Returns how many were removed.
+
+    Skips a fleet that has never held a member (still being filled) and one wearing
+    the `fleet_persist` role.
+    """
+    reaped = 0
+    for fleet_id in list(role("fleet")):
+        fleet = to_object(fleet_id)
+        if not isinstance(fleet, Fleet):
+            continue
+        if fleet.has_role(FLEET_PERSIST_ROLE):
+            continue
+        if not fleet.was_populated:
+            continue
+        if len(fleet_live_members(fleet_id)) > 0:
+            continue
+        if fleet_destroy(fleet_id):
+            reaped += 1
+    return reaped
+
+
+def fleet_reap_tick():
+    """The periodic empty-fleet sweep. Started by `fleet_reap_start`."""
+    fleet_purge_empty()
+    yield AWAIT(delay_sim(seconds=FLEET_REAP_INTERVAL))
+    yield jump(fleet_reap_tick)
+
+
+def fleet_reap_start():
+    """Start the sweep, once per mission.
+
+    The latch lives on `Agent.SHARED`, not in a module global: the engine forks a fresh
+    process per mission but the dev runner REUSES the interpreter, so a module-level
+    "already started" flag would survive into the next mission and the sweep would
+    never run again from run 2 onward. Agent.SHARED is rebuilt per mission, so the
+    latch resets with it - while a second `game_started` emit still cannot double-schedule.
+    """
+    if get_inventory_value(Agent.SHARED, "fleet_reaper_started", False):
+        return
+    set_inventory_value(Agent.SHARED, "fleet_reaper_started", True)
+    task_schedule(fleet_reap_tick)
+
 
 
 
