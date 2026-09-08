@@ -7,57 +7,268 @@ nobody named arrives with somebody at it.
 None of these bind to a hull or a ship name, deliberately - they are offered, never imposed.
 A mod that wants its own crew on its own hulls declares `Hull:` and needs none of this.
 
+`Gender:` is here because a face is ROLLED for anyone with no `Face:` of their own, and a
+terran face has a gender axis - so without it the roll is a coin toss against the name above
+it. It says which face, and nothing else.
+
 ## [TSN Watch](tsn_watch)
 ---
 crew
 Race: terran
 ---
-A Terran Stellar Navy bridge watch. The default answer for a TSN hull.
+A Terran Stellar Navy watch bill - the default answer for a TSN hull.
+
+Deep enough to crew a whole ship, not just a bridge. The first seven name their station;
+the rest name none, which makes them FLOATING officers - `_seat_pick` offers a member with
+no `Console:` to any seat nobody was written for. A game with a dozen consoles open, a
+second science station and a hangar full of pilots therefore stays inside this cast instead
+of falling through to automatic names half way down the ship.
 
 ### [Ione Marek](marek)
 ---
 Rank: Commander
 Console: mainscreen
+Gender: female
 ---
 
 ### [Sana Okonjo](okonjo)
 ---
 Rank: Lieutenant
 Console: helm
+Gender: female
 ---
 
 ### [Bex Ferrero](ferrero)
 ---
 Rank: Lieutenant
 Console: weapons
+Gender: female
 ---
 
 ### [Tomas Lindqvist](lindqvist)
 ---
 Rank: Lt. Commander
 Console: science
+Gender: male
 ---
 
 ### [Priya Raghunathan](raghunathan)
 ---
 Rank: Lt. Commander
 Console: engineering
+Gender: female
 ---
 
 ### [Ada Nwosu](nwosu)
 ---
 Rank: Ensign
 Console: comms
+Gender: female
+---
+
+### [Halden Voss](voss)
+---
+Rank: Lieutenant
+Console: hangar
+Gender: male
 ---
 
 ### [Kwame Osei](osei)
 ---
 Rank: Ensign
+Gender: male
 ---
 
 ### [Mirela Vasquez](vasquez)
 ---
 Rank: Ensign
+Gender: female
+---
+
+### [Elena Rooke](e_rooke)
+---
+Rank: Lt. Commander
+Gender: female
+---
+
+### [Farid Haddad](haddad)
+---
+Rank: Lieutenant
+Gender: male
+---
+
+### [Greta Bergstrom](bergstrom)
+---
+Rank: Lieutenant
+Gender: female
+---
+
+### [Idris Achebe](achebe)
+---
+Rank: Lieutenant
+Gender: male
+---
+
+### [Juno Castellanos](castellanos)
+---
+Rank: Lt. j.g.
+Gender: fluid
+---
+
+### [Liesl Duarte](duarte)
+---
+Rank: Lt. j.g.
+Gender: female
+---
+
+### [Mateo Gallardo](gallardo)
+---
+Rank: Lt. j.g.
+Gender: male
+---
+
+### [Nkechi Ivanova](ivanova)
+---
+Rank: Lt. j.g.
+Gender: female
+---
+
+### [Osric Jansen](jansen)
+---
+Rank: Ensign
+Gender: male
+---
+
+### [Rasa Kowalski](kowalski)
+---
+Rank: Ensign
+Gender: female
+---
+
+### [Tomas Laurent](laurent)
+---
+Rank: Ensign
+Gender: male
+---
+
+### [Ume Mbeki](mbeki)
+---
+Rank: Ensign
+Gender: female
+---
+
+### [Vikram Nakamura](nakamura)
+---
+Rank: Ensign
+Gender: male
+---
+
+### [Wren Oyelaran](oyelaran)
+---
+Rank: Ensign
+Gender: fluid
+---
+
+### [Xiulan Pashenko](pashenko)
+---
+Rank: Chief Petty Officer
+Gender: female
+---
+
+### [Yusra Quiroga](quiroga)
+---
+Rank: Chief Petty Officer
+Gender: female
+---
+
+### [Zofia Rasmussen](rasmussen)
+---
+Rank: Chief Petty Officer
+Gender: female
+---
+
+### [Amara Suleiman](suleiman)
+---
+Rank: Petty Officer
+Gender: female
+---
+
+### [Bodhi Ueda](ueda)
+---
+Rank: Petty Officer
+Gender: male
+---
+
+### [Cato Varga](varga)
+---
+Rank: Petty Officer
+Gender: male
+---
+
+### [Dagny Whitlock](whitlock)
+---
+Rank: Petty Officer
+Gender: female
+---
+
+### [Emeka Eskildsen](eskildsen)
+---
+Rank: Petty Officer
+Gender: male
+---
+
+### [Freya Fontaine](fontaine)
+---
+Rank: Crewman
+Gender: female
+---
+
+### [Goro Sarkis](sarkis)
+---
+Rank: Crewman
+Gender: male
+---
+
+### [Hana Petrov](petrov)
+---
+Rank: Crewman
+Gender: female
+---
+
+### [Kiran Delgado](delgado)
+---
+Rank: Crewman
+Gender: male
+---
+
+### [Mira Ashworth](ashworth)
+---
+Rank: Crewman
+Gender: female
+---
+
+### [Ansel Okafor](okafor)
+---
+Rank: Crewman
+Gender: male
+---
+
+### [Bex Solano](solano)
+---
+Rank: Crewman
+Gender: female
+---
+
+### [Corbin Nakashima](nakashima)
+---
+Rank: Crewman
+Gender: male
+---
+
+### [Dmitri Okonkwo](okonkwo)
+---
+Rank: Crewman
+Gender: male
 ---
 
 ## [Deep Watch](deep_watch)
@@ -73,18 +284,21 @@ of a skeleton watch.
 ---
 Rank: Lieutenant
 Console: helm
+Gender: male
 ---
 
 ### [Yusra Al-Amin](alamin)
 ---
 Rank: Ensign
 Console: science
+Gender: female
 ---
 
 ### [Dmitri Sarkisian](sarkisian)
 ---
 Rank: Ensign
 Console: engineering
+Gender: male
 ---
 
 ## [Free Traders](free_traders)
@@ -98,24 +312,29 @@ the players are not navy.
 ### [Corbin Vale](vale)
 ---
 Console: helm
+Gender: male
 ---
 
 ### [Nkechi Balogun](balogun)
 ---
 Console: science
+Gender: female
 ---
 
 ### [Rasa Petrauskas](petrauskas)
 ---
 Console: engineering
+Gender: female
 ---
 
 ### [Joaquin Ferreira](ferreira)
 ---
 Console: comms
+Gender: male
 ---
 
 ### [Sunny Tsai](tsai)
 ---
 Console: weapons
+Gender: female
 ---

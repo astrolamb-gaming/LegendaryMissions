@@ -41,6 +41,7 @@ av_title: AVATAR EDITOR
 av_done_signal: avatar_editor_done
 av_return: ""
 av_face: ""
+av_required: ""
 ```
     # START FROM THE FACE THEY ALREADY HAVE, when they have one. `parse_face` is the inverse
     # of `build_face` and round-trips exactly, so the sliders open where the person is rather
@@ -63,6 +64,24 @@ av_face: ""
     else:
         av_values = [f.get("min", 0) for f in av_features]
         av_enables = [True] * len(av_features)
+
+--- avatar_editor_required
+    # FEATURES THE CALLER SAYS ARE NOT OPTIONAL HERE, by label: `av_required: Uniform`.
+    #
+    # `FACE_FEATURES` is the general recipe and is right to call a uniform optional - the
+    # game is full of civilians, and the modding tool this was ported from builds them. But
+    # a BRIDGE OFFICER out of uniform is not a variation on a crew member, it is a stranger
+    # at the helm, so the screen that edits one must not offer to take it off.
+    #
+    # Turned on rather than hidden: a required feature keeps its slider (which uniform you
+    # wear is still a choice) and loses only the checkbox that could switch it off.
+    #
+    # An inline label rather than two copies, because the race picker rebuilds the whole
+    # feature list and has to re-apply this before it paints.
+    av_required_list = [str(x).strip().lower() for x in str(av_required).split(",") if str(x).strip()]
+    for i, widget in enumerate(av_features):
+        if str(widget["label"]).lower() in av_required_list:
+            av_enables[i] = True
 
 --- avatar_editor_paint
     face = faces.build_face(av_race, av_values, av_enables)
@@ -88,7 +107,7 @@ av_face: ""
         av_features = faces.FACE_FEATURES.get(av_race)
         av_values = [f.get("min", 0) for f in av_features]
         av_enables = [True] * len(av_features)
-        jump avatar_editor_paint
+        jump avatar_editor_required
 
     # Per-feature controls
     gui_section(style="area: 100-400px, 20, 100, 92;row-height:2em;")
@@ -98,7 +117,7 @@ av_face: ""
         label = widget["label"]
         wmax = widget["max"]
         wmin = widget.get("min", 0)
-        if "optional" in widget:
+        if "optional" in widget and str(label).lower() not in av_required_list:
             cb = gui_checkbox("text: {label};state:{av_enables[i]}", ctrl_style, data={"windex": i})
             cb.value = av_enables[i]
             on gui_message(cb):

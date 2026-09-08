@@ -6,6 +6,8 @@ from sbs_utils.helpers import FrameContext
 from sbs_utils.procedural.gui import gui_tab_get_list
 from sbs_utils.pages.layout.measure import measure_block_height
 from sbs_utils.gui import get_client_aspect_ratio
+from sbs_utils.mast.mast_node import MastDataObject
+from sbs_utils.procedural.crew import crew_preview_post, crew_preview_markdown
 
 
 def console_select_tab(event, sender):
@@ -298,3 +300,45 @@ def comms_message_item(item):
     else:
         gui_blank(1,"col-width:2em")
     
+
+
+# --- who is at this console -----------------------------------------------------------
+#
+# The picker used to offer an empty "Crew person Name" box, which almost nobody filled in,
+# so the screen said nothing about who you were about to be. It shows the RESOLVED person
+# instead - the ship's cast if a mission declared one, an automatic name otherwise - and
+# the box moves behind an Edit button for the players who do want to answer.
+#
+# The height the face is drawn at. The row is 56px; 44 leaves the face clear of both edges
+# without the text area having to be told a size, which does nothing to a text area anyway.
+_IDENTITY_FACE_PX = 44
+
+
+def console_crew_identity(client_id, slot, hull, console,
+                          own_name="", own_face="", own_portrait="", own_pick=""):
+    """Who this console is about to be: one record the picker's identity row binds to.
+
+    A PREVIEW - it takes no seat and writes nothing, and because a seat's automatic name is
+    allocated once and kept, what this shows is what `crew_assign` publishes when the player
+    presses Ready. Clicking through the station list is therefore free to re-ask.
+
+    Keyed on the SLOT and the HULL rather than on a ship: the picker binds to slots and the
+    ship it is choosing a hull for may not exist yet, which is exactly when a mod's
+    `Hull:`-bound cast has to be able to answer.
+    """
+    post = crew_preview_post(client_id, None, console,
+                             own_name=own_name, own_face=own_face,
+                             own_portrait=own_portrait, own_pick=own_pick,
+                             hull=hull, slot=slot)
+    name = post.name or ""
+    rank = post.rank or ""
+    return MastDataObject({
+        # Reads as a prompt when there is nobody, which is what it is: press Edit and say.
+        "label": (f"{rank} {name}".strip() if name else "No crew name"),
+        "name": name,
+        "rank": rank,
+        "face": post.face or "",
+        "portrait": post.portrait or "",
+        "markdown": crew_preview_markdown(post.face, post.portrait,
+                                          height=_IDENTITY_FACE_PX, align="left"),
+    })

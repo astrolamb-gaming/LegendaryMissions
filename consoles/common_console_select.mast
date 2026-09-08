@@ -11,11 +11,14 @@ crew_pick = ""
 default shared grid_data = grid_get_grid_data()
 default SETTINGS = settings_get_defaults()
 
-# The picker's Edit affordance. Off switches it back to the plain name box this screen has
-# always had. `allow_portrait` stays False: pointing a console UI at an arbitrary file is a
-# different conversation, and the group-photo case is served by a reviewable .amd.
-settings_add_defaults({"CREW_EDIT": {"enable": True, "allow_face": True, "allow_portrait": False}})
-shared CREW_EDIT = settings_get_defaults().get("CREW_EDIT", {"enable": True, "allow_face": True, "allow_portrait": False})
+# The picker's Edit affordance. `enable` off leaves the identity line as a READOUT - the
+# ship's cast still crews the console, it simply cannot be argued with, which is what a
+# mission wanting its own crew worn rather than chosen asks for. `allow_name` and
+# `allow_face` gate the two fields inside the Edit page. `allow_portrait` stays False:
+# pointing a console UI at an arbitrary file is a different conversation, and the
+# group-photo case is served by a reviewable .amd.
+settings_add_defaults({"CREW_EDIT": {"enable": True, "allow_name": True, "allow_face": True, "allow_portrait": False}})
+shared CREW_EDIT = settings_get_defaults().get("CREW_EDIT", {"enable": True, "allow_name": True, "allow_face": True, "allow_portrait": False})
 
 # Set by the avatar_editor addon's top level when it is loaded. SUGGESTS, never requires:
 # a hard dependency on an addon most missions do not load is how LM's hangar took 22
@@ -405,61 +408,39 @@ if CAN_CHANGE_CONSOLE:
     gui_section( style="area: 510px, 2, 99,100-60px;")
     gui_row(style="row-height: 45px;")
 
-    crew_input = gui_input("desc:Crew person Name", var="crew_name")
-    # BESIDE the name box, not under it - it edits the person that box names, and a button
-    # on its own row reads as belonging to whatever follows it. Fixed width so the input
-    # keeps the rest of the row rather than the two splitting it evenly.
-    #
-    # Guarded on CREW_AVATAR_EDITOR, which the avatar_editor addon sets at its own top
-    # level - SUGGESTED, never required. A hard dependency on an addon most missions do not
-    # load is how LM's hangar took twenty-two missions to zero labels. A jump to a label
-    # nothing defines compiles clean, so the guard on the button is the whole guard needed.
-    if CREW_EDIT.get("enable", True) and CREW_EDIT.get("allow_face", True) and CREW_AVATAR_EDITOR:
-        on gui_message(gui_button("Edit Face", style="col-width: 7em;")):
-            jump crew_edit_avatar
-
     #
     # WHO IS AT THIS CONSOLE
     #
-    # The name box above is unchanged and still outranks everything: what a person typed
-    # about themselves beats what a mission decided about them.
+    # The RESOLVED person, not an empty box. A name was only ever worked out after the
+    # console was chosen, so this screen - the one place a player is deciding what to be -
+    # was the one place that could not say. The face and the name are the ship's cast where
+    # a mission declared one and an automatic crew member otherwise, and both follow the
+    # station highlighted in the list.
     #
-    # CREW_EDIT.enable off puts this screen back to exactly the plain name box it has always
-    # been. It does NOT stop a roster staffing consoles - that is not an edit, it is the
-    # mission's own answer, and a game that wants no crew at all simply declares no roster.
+    # Nothing here writes: it is a preview, and because a seat's automatic name is allocated
+    # once and kept, it is the same person the console gets on Ready.
     default crew_choice = ""
-    crew_people = crew_choices_for(client_select_ship_id, None, client_id)
-    crew_ui = CREW_EDIT.get("enable", True) and len(crew_people) > 0
+    crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
 
-    if crew_ui:
-        # An OVERRIDE, not the normal path. A cast roster already fills consoles by itself,
-        # so reaching for this list is reaching past the automatic answer - which is why it
-        # offers everyone free rather than only the people who crew the selected station.
-        # That also keeps it honest: this panel updates CONSOLE_SELECT in place without
-        # repainting, so a console-narrowed list would go stale the moment somebody clicked
-        # a different station.
-        gui_row(style="row-height: 45px;")
-        crew_list = ",".join([p.name for p in crew_people])
-        crew_dd = gui_drop_down(f"$text: {crew_choice or 'auto'};list: auto,{crew_list}")
+    # ONE text area for the likeness, because a text area already speaks both `face://` and
+    # `image://` - so nothing has to swap widgets when a roster answers with a photograph
+    # instead of a face string. Deliberately NOT inside a gui_region: a child updated in
+    # place inside an absolute region ghosts in the real engine, and this very file has
+    # already paid for that once with the ship name.
+    gui_row(style="row-height: 56px;")
+    crew_pic = gui_text_area(crew_ident.markdown, style="col-width: 60px;")
+    crew_label = gui_text(f"$text:`{crew_ident.label}`;justify: left;")
 
-        # ONE text area for the likeness, because a text area already speaks both `face://`
-        # and `image://` - so nothing has to swap widgets when a roster answers with a
-        # photograph instead of a face string. Deliberately NOT inside a gui_region: a child
-        # updated in place inside an absolute region ghosts in the real engine, and this very
-        # file has already paid for that once with the ship name.
-        #
-        # No background on this row. gui_face takes the face string where every other widget
-        # takes a style, so a face cannot carry a draw layer and an opaque raised backdrop
-        # here would simply hide it.
-        gui_row(style="row-height: 96px;")
-        crew_pic = gui_text_area(crew_preview_markdown(crew_face, crew_portrait))
-
-        on gui_message(crew_dd):
-            crew_choice = crew_dd.value
-            crew_pick = crew_pick_for(client_select_ship_id, crew_choice, client_id)
-            crew_name, crew_face, crew_portrait = crew_preview(crew_pick)
-            crew_input.value = crew_name
-            crew_pic.value = crew_preview_markdown(crew_face, crew_portrait)
+    # EDIT, not "Edit Face" - the page behind it owns the whole identity now, the name
+    # included, and a button that names one field of it reads as the only field there is.
+    # Fixed width so the name keeps the rest of the row.
+    #
+    # CREW_EDIT.enable off leaves the line as a readout: a mission that wants its cast worn
+    # rather than chosen gets exactly that, which is a better "off" than the empty name box
+    # this screen used to fall back to.
+    if CREW_EDIT.get("enable", True):
+        on gui_message(gui_button("Edit", style="col-width: 5em;")):
+            jump crew_edit_identity
 
     gui_row(style="row-height: 45px;")
     gui_blank()
@@ -591,6 +572,13 @@ if CAN_CHANGE_CONSOLE:
         #
         console_select_item = console_select_lb.get_value()
         CONSOLE_SELECT = console_select_item.path
+        # A DIFFERENT SEAT IS A DIFFERENT PERSON. The cast crews by console, so highlighting
+        # engineering shows the engineer. Updated in place rather than repainted: a repaint
+        # is send_gui_* over the network for every widget on the screen, and this fires on
+        # every click in the console list.
+        crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+        crew_pic.value = crew_ident.markdown
+        crew_label.value = f"$text:`{crew_ident.label}`;justify: left;"
         if not GAME_STARTED:
             console_ready = False
             cb_ready.value = False
@@ -642,6 +630,12 @@ if CAN_CHANGE_CONSOLE:
                 # Same absolute-region ghost as the rename path: re-present the
                 # whole ship_sec_not region so its clear runs before the redraw.
                 gui_represent(ship_sec_not)
+                # ANOTHER SHIP IS ANOTHER CREW. A ship has its own complement, and a hull
+                # can carry a cast of its own - a mod's Galaxy-class arrives with one.
+                ship_type_def = ship_type
+                crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+                crew_pic.value = crew_ident.markdown
+                crew_label.value = f"$text:`{crew_ident.label}`;justify: left;"
 
 
         # WAS TWO PER-FRAME ENGINE READS. These were `on change
@@ -659,6 +653,11 @@ if CAN_CHANGE_CONSOLE:
             _display.value = ship_name
             gui_update("sh_ship_picker", ship_type)
             gui_update("sh_ship_list", None)
+            # The hull changed, so the cast bound to it may have too.
+            ship_type_def = ship_type
+            crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+            crew_pic.value = crew_ident.markdown
+            crew_label.value = f"$text:`{crew_ident.label}`;justify: left;"
             # _display lives in the ship_sec_not absolute gui_region. Setting its
             # .value only marks the child widget dirty, and the dirty pass re-sends
             # the text into the sub-region WITHOUT a clear - so the old name stays
@@ -909,7 +908,18 @@ $t Waiting for the server to start the mission
     # also entered by a direct jump (the headless exerciser does exactly that), and a task
     # variable set by the picker's own walk-through is not defined on that path.
     crew_ship_id = sbs.get_ship_of_client(client_id)
-    crew_post = crew_assign(client_id, crew_ship_id, CONSOLE_SELECT, own_name=crew_name, own_face=crew_face, own_portrait=crew_portrait, own_pick=crew_pick)
+    # AND THE SLOT, which is what the picker previewed against. An automatic name belongs to
+    # a (ship, console) seat, and before the game starts there is no ship to be that - so the
+    # slot is the ship's stable identity here as it is everywhere else this file binds.
+    # Read off the client rather than carried from the picker, because show_console_selected
+    # is also entered by a direct jump (the headless exerciser does exactly that) where the
+    # picker's task variables do not exist. `console_selected` binds the slot before jumping
+    # here, so this is the slot the preview used.
+    crew_slot = player_roster_slot_of_client(client_id)
+    crew_hull = ""
+    if crew_slot is not None:
+        crew_hull = player_roster_display(crew_slot)["hull"]
+    crew_post = crew_assign(client_id, crew_ship_id, CONSOLE_SELECT, own_name=crew_name, own_face=crew_face, own_portrait=crew_portrait, own_pick=crew_pick, hull=crew_hull, slot=crew_slot)
 
     # ONLY WHAT THIS HUMAN CHOSE goes to a client string. They persist per MACHINE, in
     # client_string_set.txt, so writing a RESOLVED name here would follow this PC into every
@@ -1054,16 +1064,28 @@ $t on ship {client_select_ship}
     # Only reachable from a button that is only built when CREW_AVATAR_EDITOR says the addon
     # is loaded. A jump to a label nothing defines compiles clean and would only fail if it
     # ever RAN, so the guard on the button is the whole guard needed.
-    # HAND IT THE FACE THEY ALREADY HAVE, so the editor opens on them rather than on a
-    # stranger. `crew_face` first - that is what the preview beside the button is showing -
-    # then whatever they were last actually assigned, which is where an automatic face lives
-    # once they have opened a console. Empty is fine; the editor starts from its defaults.
-    av_face = crew_face
+    # HAND IT THE FACE ON SCREEN, so the editor opens on the person the identity line is
+    # showing rather than on a stranger.
+    #
+    # THE RESOLVED FACE, not `crew_face`. `crew_face` holds only what this human built for
+    # themselves, and is empty for everybody who has not - which is nearly everybody, and
+    # exactly the people reaching for the editor. The seat's own face lives in the preview
+    # and nowhere else until the console is entered, so ask for it the way the line does.
+    # `crew_face` still wins where there IS one: it is what the line is showing too.
+    crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+    av_face = crew_ident.face
     if not av_face:
         av_face = get_inventory_value(client_id, "CREW_FACE", "")
     # Only used when the face does not name its own race, which it does whenever there is one.
-    av_race = crew_avatar_race(client_select_ship_id)
+    # The HULL, not a ship: this screen is choosing one for a ship that may not exist yet,
+    # and crew_avatar_race takes a bare key for exactly that reason.
+    av_race = crew_avatar_race(ship_type_def)
     av_title = "YOUR AVATAR"
+    # A CREW MEMBER WEARS A UNIFORM. The editor treats it as an optional feature, which is
+    # right in general - the game is full of civilians - and wrong for a bridge officer:
+    # switching it off does not make a variation of the person, it makes a stranger at the
+    # helm. The slider stays, so which uniform is still theirs to pick.
+    av_required = "Uniform"
     av_return = "crew_edit_done"
     jump avatar_editor_show
 
@@ -1075,4 +1097,91 @@ $t on ship {client_select_ship}
     crew_portrait = ""
     crew_pick = ""
     crew_choice = ""
-    jump select_console
+    # Back to the identity page, not to the picker: the face is one field of an identity
+    # that is still being edited, and returning past the page they were on would read as
+    # the edit having been finished for them.
+    jump crew_edit_identity
+
+
+===== crew_edit_identity =====
+    # THE WHOLE IDENTITY, on its own screen. It replaced an "Edit Face" button beside a name
+    # box, which said that a face was the editable part of a person and a name was a form
+    # field. Both are here, and so is the roster's list of who you could be instead.
+    #
+    # Reached only from the picker's Edit button, which is built only when CREW_EDIT says
+    # editing is allowed - a mission that wants its cast worn rather than chosen turns the
+    # button off and never arrives here.
+    # THE SAME GUARD THE PICKER CARRIES, for the same reason. These are set in
+    # `client_main` and `select_console`; a jump that reached this label any other way
+    # leaves them undefined, and a failing expression does not skip a line - it ENDS the
+    # command, so the page would stop building half way and leave a partial screen.
+    default client_select_slot = None
+    default ship_type_def = "invisible"
+    default CONSOLE_SELECT = ""
+    default crew_name = ""
+    default crew_face = ""
+    default crew_portrait = ""
+    default crew_pick = ""
+    default crew_choice = ""
+
+    crew_people = crew_choices_for(None, None, client_id, ship_type_def)
+    crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+
+    gui_section(style="area: 25,15,75,85;")
+    gui_row(style="row-height: 2em;")
+    gui_text("$text:`CREW IDENTITY`;font:gui-3;justify: left;")
+
+    gui_row(style="row-height: 96px;")
+    ident_pic = gui_text_area(crew_preview_markdown(crew_ident.face, crew_ident.portrait), style="col-width: 110px;")
+    ident_name = gui_text(f"$text:`{crew_ident.label}`;justify: left;")
+
+    if CREW_EDIT.get("allow_name", True):
+        gui_row(style="row-height: 45px;")
+        ident_input = gui_input("desc:Name", var="crew_name")
+        on change crew_name:
+            # A TYPED NAME IS TIER 1 and beats everything, so saying one here also stops
+            # being whoever the roster picked - the two are answers to the same question.
+            crew_pick = ""
+            crew_choice = ""
+            crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+            ident_name.value = f"$text:`{crew_ident.label}`;justify: left;"
+
+    if len(crew_people) > 0:
+        # BE SOMEBODY OFF THE ROSTER. An override rather than the normal path - a cast fills
+        # consoles by itself - which is why it offers everyone still free rather than only
+        # the people who crew the selected station.
+        gui_row(style="row-height: 45px;")
+        crew_list = ",".join([p.name for p in crew_people])
+        crew_dd = gui_drop_down(f"$text: {crew_choice or 'auto'};list: auto,{crew_list}")
+        on gui_message(crew_dd):
+            crew_choice = crew_dd.value
+            crew_pick = crew_pick_for(None, crew_choice, client_id, ship_type_def)
+            crew_name, crew_face, crew_portrait = crew_preview(crew_pick)
+            crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+            ident_pic.value = crew_preview_markdown(crew_ident.face, crew_ident.portrait)
+            ident_name.value = f"$text:`{crew_ident.label}`;justify: left;"
+
+    gui_row(style="row-height: 45px;")
+    # Guarded on CREW_AVATAR_EDITOR, which the avatar_editor addon sets at its own top level
+    # - SUGGESTED, never required. A hard dependency on an addon most missions do not load is
+    # how LM's hangar took twenty-two missions to zero labels. A jump to a label nothing
+    # defines compiles clean, so the guard on the button is the whole guard needed.
+    if CREW_EDIT.get("allow_face", True) and CREW_AVATAR_EDITOR:
+        on gui_message(gui_button("Edit Avatar")):
+            jump crew_edit_avatar
+
+    on gui_message(gui_button("Use Default")):
+        # Back to whoever the ship says is at this station. Every field a player chose goes,
+        # because they are ALL tier 1 - leaving one behind would keep overriding the answer
+        # the button just asked for.
+        crew_name = ""
+        crew_face = ""
+        crew_portrait = ""
+        crew_pick = ""
+        crew_choice = ""
+        jump crew_edit_identity
+
+    on gui_message(gui_button("Done")):
+        jump select_console
+
+    await gui()

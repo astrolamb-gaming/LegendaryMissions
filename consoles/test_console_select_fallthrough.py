@@ -59,7 +59,7 @@ class TestPickerFallthrough(unittest.TestCase):
             "opening the console - silently. Put the new label at the end of the file.")
 
     def test_the_crew_edit_labels_cannot_be_fallen_into(self):
-        """They are only ever reached by the Edit Face button's jump.
+        """They are only ever reached by the Edit button's jump.
 
         Whatever precedes each must not run on into it: either it is a `//` route (routes do
         not fall through) or it ends in a jump.
@@ -76,7 +76,11 @@ class TestPickerFallthrough(unittest.TestCase):
                 "It must follow a jump, an ->END, or a // route.")
 
     def test_each_crew_edit_label_leaves_deliberately(self):
-        """Neither may fall out into whatever follows it either."""
+        """None of them may fall out into whatever follows it either.
+
+        A GUI page parks on `await gui()` instead of jumping - it hands control to its own
+        handlers and never runs past that line - so it ends deliberately too.
+        """
         starts = [i for _n, i in self.labels]
         for pos, (name, idx) in enumerate(self.labels):
             if not name.startswith("crew_edit"):
@@ -86,7 +90,7 @@ class TestPickerFallthrough(unittest.TestCase):
             self.assertTrue(body, name)
             last = body[-1]
             self.assertTrue(
-                last.startswith("jump ") or last.startswith("->"),
+                last.startswith("jump ") or last.startswith("->") or last == "await gui()",
                 f"{name} ends on {last!r} and would fall into whatever comes next")
 
 
