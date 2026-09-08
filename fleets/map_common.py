@@ -46,16 +46,36 @@ STOCK_THEATER = "legendary"
 
 
 def _fleet_can_raid(eligible=None):
-    """`eligible`, ANDed with "this race has a fleet ladder registered".
+    """`eligible`, ANDed with "this race is an enabled NPC race with a fleet ladder".
 
     The ladder half is `fleet_table_can_field`, which names a rostered race it cannot
     field once per mission - a theater naming a race nothing can build is a data error in
     the theater, and the quiet version of it is a faction written into the roster that
     simply never turns up.
+
+    THE NPC_RACES HALF IS THE ANSWER TO "Skaraan show up even when they aren't NPC
+    races" (GWQ-12), and it is here rather than anywhere else because a THEATER roster is
+    not the NPC_RACES setting and never has been. The stock `legendary` theater rosters
+    skaraan; a TNG game excludes skaraan from NPC_RACES; and the only thing standing
+    between the two was that the ladder happens to be registered behind the same setting,
+    over in `races/__init__.mast`. That is a second gate in another addon's top-level
+    code, and addon load order is not deterministic - so "is the ladder registered yet"
+    was doing duty for "is this race allowed", which it only resembles.
+
+    Asking the setting directly makes the rule the rule: a race the operator has turned
+    off cannot be PICKED, whatever any theater rosters and whoever loaded first. Note
+    this gates the random/theater pick only - `fleet_create` uses an explicitly named
+    race as given, so a map that deliberately spawns one faction (siege's Skaraan
+    "independent contractors") is untouched.
     """
     from sbs_utils.procedural.fleet_tables import fleet_table_can_field
+    from sbs_utils.procedural.settings import settings_race_is_npc
 
     def test(race):
+        # An EMPTY NPC_RACES means "no restriction", not "no races" - that is the
+        # setting's own contract, so this cannot empty a mission that never set it.
+        if not settings_race_is_npc(race):
+            return False
         if not fleet_table_can_field(race):
             return False
         return eligible is None or eligible(race)
@@ -117,6 +137,30 @@ def fleet_pick_enemy_race(race_list=None, weights=None, difficulty=None, eligibl
     if weights and len(weights) == len(fallback):
         return random.choices(fallback, weights=weights)[0]
     return random.choice(fallback)
+
+
+# Said once per PROCESS. Cosmos forks a fresh interpreter per mission, so in the engine
+# that is once per mission - but `cosmos_dev` reuses one across `run_next_mission`, so a
+# soak sees this line on run 1 and not on runs 2+. Deliberate: it is an audit note, not
+# state anything reads, and no LegendaryMissions addon is on the reset ledger yet.
+_OFF_ROSTER_NOTED = set()
+
+
+def _fleet_note_off_roster(race):
+    """Say, once per race, that a fleet was built for a race NPC_RACES has switched off.
+
+    Not a warning about a bug - naming a race outright is a legitimate thing for a map to
+    do, and refusing it would break siege. It is an audit line, so that "why is that here"
+    has an answer next time somebody asks.
+    """
+    from sbs_utils.procedural.settings import settings_race_is_npc
+    key = str(race or "").strip().lower()
+    if not key or key in _OFF_ROSTER_NOTED or settings_race_is_npc(key):
+        return
+    _OFF_ROSTER_NOTED.add(key)
+    print(f"fleet_create: building a '{key}' fleet, which the NPC_RACES setting does NOT "
+          f"include - something asked for this race by name (a map literal, the GM, or a "
+          f"prefab), it was not picked from the roster.")
 
 
 def fleet_enemy_races(eligible=None):
@@ -183,6 +227,21 @@ def fleet_create(race, fleet_diff, posx, posy, posz, fleet_roles = "RaiderFleet"
         # any path that said "random", and the theater's ladder was quietly bypassed.
         race = fleet_pick_enemy_race() or fleet_table_pick_race() or "kralien"
         race = str(race).strip().lower()
+    else:
+        # AN EXPLICITLY NAMED RACE IS STILL BUILT, and it says so when the mission has
+        # that race switched off.
+        #
+        # This is the deliberate hole in the NPC_RACES gate: `_fleet_can_raid` filters the
+        # random/theater PICK, but a caller that names a faction outright means it -
+        # siege's Skaraan "independent contractors" are the standing example, and
+        # `17b47a7` left them alone on purpose. So this cannot refuse.
+        #
+        # It can stop being anonymous, though. "Skaraan show up even when they aren't NPC
+        # races" (GWQ-12) cost a day and was never reproduced, because a hostile that
+        # simply appears carries no account of who asked for it. Now the one path that
+        # can still do it names itself in the log, once per race, and the next report of
+        # this comes with its own answer.
+        _fleet_note_off_roster(race)
     siege_fleet = fleet_table_get(race, fleet_diff)
     if not siege_fleet:
         # A race with no registered ladder - not in NPC_RACES, or a typo. Say so: the

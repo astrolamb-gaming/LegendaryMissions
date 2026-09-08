@@ -3,7 +3,7 @@ brain_scan_tick = 0
 brain_scan_task = None
 brain_to_watch = None
 
-//gui/tab/brain if is_dev_build()
+//gui/app/brain if is_dev_build()
     jump brain_screen
 
 === brain_scan_update
@@ -27,11 +27,15 @@ brain_to_watch = None
     if brain_scan_task is None:
         sub_task_schedule(brain_scan_update)
     
-    gui_tab_back("debug")
+    # ONE GUI TAB, and it is the way back to the console - the same line every
+    # other PADD screen declares.
+    gui_tab_back(CONSOLE_SELECT)
+    gui_app_chrome("Brain scan")
+    gui_app_subnav(["debug", "mast"])
     gui_activate_console("brain")
 
     # Whole screen
-    gui_section(style="area:0,45px,100,100;")
+    gui_section(style="area:0,100px,100,100;")
 
     with gui_sub_section("col-width:75;"):
         #   with t:

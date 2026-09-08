@@ -23,8 +23,13 @@ default CONSOLE_SELECT = ""
 # --- FABRICATE: list box of ALL recipes (left) + detail panel (right). Beacon recipes show
 # the program selectors (monster + attract/repel) and build via beacon_build; other recipes
 # just build their Output into inventory via fabricate_recipe. ---
-//gui/tab/fabricate
+//gui/app/fabricate
 --- fab_repaint
+    # ONE GUI TAB, and it is the way back to the console. The PADD adds nothing to
+    # the strip and changes nothing about it - it declares a back tab like any
+    # other screen and the bar draws it the way it always has. Removing this line
+    # is what forced the strip to synthesise a back entry, which is what kept
+    # breaking the bar's own back button.
     gui_tab_back(CONSOLE_SELECT)
     # RE-DECLARE THE WHOLE STRIP, not just the back tab. The page CONSUMES its tab
     # declarations: maststorypage clears `console_tabs` and `__back_tab__` as soon as
@@ -175,8 +180,13 @@ default CONSOLE_SELECT = ""
 
 # --- CARGO: list box of ALL carried cargo (left) + detail panel (right). Beacons offer
 # Deliver to Weapons + Eject; items/materials offer Eject. ---
-//gui/tab/cargo
+//gui/app/cargo
 --- cargo_repaint
+    # ONE GUI TAB, and it is the way back to the console. The PADD adds nothing to
+    # the strip and changes nothing about it - it declares a back tab like any
+    # other screen and the bar draws it the way it always has. Removing this line
+    # is what forced the strip to synthesise a back entry, which is what kept
+    # breaking the bar's own back button.
     gui_tab_back(CONSOLE_SELECT)
     # Same as fab_repaint: the strip is consumed on every build. See there.
     gui_tab_enable("fabricate,cargo")
