@@ -5,7 +5,7 @@ dolly = 50
 orbit = 180.0
 do_move = 0
 property_pane = None
-info_panel_width = "40"
+info_panel_width = "30"
 
 default SETTINGS = settings_get_defaults()
 default shared GAMEMASTER_CONSOLE = SETTINGS.get("GAMEMASTER", {"enable": True})
@@ -241,12 +241,13 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
 --- gm_nav_area_slider
     with gui_section(f"area:{info_panel_width},95,100,100;"):
         cur = get_inventory_value(cambot, f"GAMEMASTER_lmb_SIZE", 5000)
-        s = gui_slider("low: 0; high: 100000;", var="GM_NAV_AREA_SLIDER")
+        s = gui_slider("low: 2000; high: 50000;", var="GM_NAV_AREA_SLIDER")
         s.value = cur
         on change s.value:
             cambot = sbs.get_ship_of_client(client_id)
             cur = get_inventory_value(cambot, f"GAMEMASTER_lmb_SIZE", 5000)
-            delta = cur - s.value
+            delta=1
+            set_inventory_value(cambot, "GAMEMASTER_lmb_SIZE", s.value)
             pos = gamemaster_get_pos(cambot, "lmb")
             gamemaster_show_nav_area(cambot, pos, delta, "Game Master", "lmb", "#040")
 
