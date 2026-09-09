@@ -251,6 +251,8 @@ def gm_get_origins_sides_roles() -> dict:
         # key = ship.get("key")
         # print(key)
         o = ship.get("origin")
+        if o == "monster" or o == "Roklithoid":
+            continue
         if o is not None:
             origin_set.add(o + " ")
         s = ship.get("side")
@@ -263,7 +265,7 @@ def gm_get_origins_sides_roles() -> dict:
                 role_set.add(_r.strip() + " ")
         else:
             key = ship.get("key")
-            print(f"{key} doesn't have a role...")
+            print(f"{key} doesn't have a role specified in shipData...")
 
     origins_sides_roles = {
         "origins": origin_set,

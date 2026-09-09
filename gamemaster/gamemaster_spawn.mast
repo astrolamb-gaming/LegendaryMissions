@@ -2,6 +2,8 @@
     # This shoudn't actually do anything. It's mostly here to prevent `gm_menu_spawn` from running immediately on startup without being attached to a gui.
     ->END
 
+
+#region GM Spawn Single Ships
 === gm_menu_spawn_ships
 metadata: ``` yaml
 type: gm_menu/ships
@@ -167,6 +169,8 @@ icon_index: 160
     prefab_spawn(prefab_single_ship, data={"ship_role":spawn_roles,"ship_art": art, "side_value": spawn_side}, OFFSET_X=pos.x, OFFSET_Y=pos.y, OFFSET_Z=pos.z)
     ->END
 
+#endregion
+
 # === lb_test
 # metadata: ``` yaml
 # type: gm_menu/spawn/test
@@ -190,3 +194,37 @@ icon_index: 160
 #         gui_message(b1, text.lower())
 
 #     yield success
+
+
+#region GM Spawn Fleets
+
+=== gm_menu_spawn_fleets
+metadata: ``` yaml
+type: gm_menu/fleets
+icon_index: 105
+icon_color: "blue"
+priority: 30 # Smaller number is higher priority
+```
+
+    data = gm_get_origins_sides_roles()
+    origins = data.get("origins")
+    origins = sorted(origins, key=str.casefold)
+
+    with gui_sub_section():
+        fleet_lb = gui_list_box(origins, "", select=True)
+
+        gui_row("row-height: 2em;")
+        gui_text("$text:Fleet Difficulty:;")
+        default DIFFICULTY = 5
+        spawn_diff_dd = gui_drop_down("$text:{DIFFICULTY};list:1,2,3,4,5,6,7,8,9,10,11;")
+        gui_row("row-height: 2em;")
+        spawn_fleet_button = gui_button("Spawn Fleet")
+        on gui_message(spawn_fleet_button):
+            race = fleet_lb.value
+            diff = int(spawn_diff_dd.value)
+            cambot = sbs.get_ship_of_client(client_id)
+            pos = gamemaster_get_pos(cambot, "lmb")
+            fleet = prefab_spawn(prefab_fleet_raider, data={"race": race, "fleet_difficulty": diff}, OFFSET_X=pos.x, OFFSET_Y=pos.y, OFFSET_Z=pos.z)
+
+    yield success
+#endregion
