@@ -88,7 +88,25 @@ class TestWhatTheLineSays(IdentityCase):
         self.assertTrue(line.face, "and it should have a face to go with it")
 
     def test_what_the_player_typed_wins(self):
-        self.assertEqual(self.ident("engineering", name="Doug").label, "Doug")
+        line = self.ident("engineering", name="Doug")
+        self.assertEqual(line.name, "Doug")
+
+    def test_a_typed_name_keeps_the_rest_of_the_person(self):
+        """Editing ONE aspect must not clear the others. Renaming the engineer does not
+        strip their rank or their likeness - they are the same officer under another name.
+        """
+        was = self.ident("engineering")
+        line = self.ident("engineering", name="Doug")
+        self.assertEqual(line.label, "Lt. Commander Doug")
+        self.assertEqual(line.face, was.face)
+
+    def test_building_a_face_keeps_the_name(self):
+        """The bug this pins: the avatar editor came back with `own_face` set and nothing
+        else, and the whole identity was replaced - so the console lost its name."""
+        was = self.ident("engineering")
+        line = self.ident("engineering", face="ter #fff 0 0;")
+        self.assertEqual(line.name, was.name)
+        self.assertEqual(line.face, "ter #fff 0 0;")
 
     def test_nobody_reads_as_a_prompt_rather_than_a_blank(self):
         """CREW_AUTONAME off and no roster. A blank line looks broken; this asks."""

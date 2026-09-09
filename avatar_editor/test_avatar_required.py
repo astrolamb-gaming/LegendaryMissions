@@ -66,6 +66,18 @@ class TestTheCrewFlowAsksForIt(unittest.TestCase):
         picker = _read(PICKER)
         self.assertIn('av_required = "Uniform"', picker)
 
+    def test_coming_back_changes_only_the_face(self):
+        """`crew_edit_done` used to clear the picked person too, and with them the name and
+        rank the line was showing - so editing an avatar renamed the console. Building a face
+        for somebody does not stop them being that person. Only the portrait goes, because a
+        photograph and a built face answer the same question."""
+        picker = _read(PICKER)
+        block = picker.split("===== crew_edit_done =====")[1].split("jump crew_edit_identity")[0]
+        self.assertIn("crew_face = AVATAR_FACE", block)
+        self.assertIn('crew_portrait = ""', block)
+        self.assertNotIn('crew_pick = ""', block)
+        self.assertNotIn('crew_name = ""', block)
+
     def test_it_hands_the_editor_the_face_on_screen(self):
         """`crew_face` holds only what this human built for themselves and is empty for
         nearly everybody - which is exactly who reaches for the editor. The seat's own face

@@ -1090,13 +1090,16 @@ $t on ship {client_select_ship}
     jump avatar_editor_show
 
 ===== crew_edit_done =====
-    # A face you BUILT replaces a picked person, explicitly and in both directions: the
-    # portrait goes because a photograph and a built face are two answers to one question,
-    # and the pick goes because you are now yourself rather than somebody off the roster.
+    # ONLY THE FACE. A player edits one aspect at a time and the rest has to survive it -
+    # this label used to clear the picked person and, through them, the name and rank the
+    # line was showing. Building a face for somebody does not stop them being that person;
+    # it gives that person a different face.
+    #
+    # The PORTRAIT still goes, and only the portrait: a photograph and a built face are two
+    # answers to the same question and nothing could resolve having both. `crew_face` empty
+    # is fine too - the resolution falls back to the face the seat already had.
     crew_face = AVATAR_FACE
     crew_portrait = ""
-    crew_pick = ""
-    crew_choice = ""
     # Back to the identity page, not to the picker: the face is one field of an identity
     # that is still being edited, and returning past the page they were on would read as
     # the edit having been finished for them.
@@ -1124,6 +1127,12 @@ $t on ship {client_select_ship}
     default crew_pick = ""
     default crew_choice = ""
 
+    # The name box is BUILT CONDITIONALLY, and the roster dropdown's handler pushes the
+    # picked person's name into it - so there has to be something to test. A bare name for a
+    # widget that was never built is a NameError, and a failing expression ends the handler
+    # rather than skipping the line.
+    default ident_input = None
+
     crew_people = crew_choices_for(None, None, client_id, ship_type_def)
     crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
 
@@ -1137,12 +1146,19 @@ $t on ship {client_select_ship}
 
     if CREW_EDIT.get("allow_name", True):
         gui_row(style="row-height: 45px;")
-        ident_input = gui_input("desc:Name", var="crew_name")
-        on change crew_name:
-            # A TYPED NAME IS TIER 1 and beats everything, so saying one here also stops
-            # being whoever the roster picked - the two are answers to the same question.
-            crew_pick = ""
-            crew_choice = ""
+        # THE BOX OPENS ON THE NAME THEY HAVE, so "edit that name" is an edit and not a
+        # retype. An input shows its var, and the var here is a SEPARATE one seeded with the
+        # resolved name - binding `crew_name` directly would have adopted an assigned name as
+        # the player's own the moment the page opened, and `crew_name` is written to a client
+        # string, which persists per MACHINE. A name the ship chose would then follow this PC
+        # into every future mission and, being the strongest tier, could never be dislodged.
+        ident_typed = crew_name or crew_ident.name
+        ident_input = gui_input("desc:Name", var="ident_typed")
+        on change ident_typed:
+            # ONLY THE NAME. Renaming yourself does not undo the face you built or the person
+            # you picked - you are that person under a different name, which is what the
+            # resolution does with a typed name over a roster member anyway.
+            crew_name = ident_typed
             crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
             ident_name.value = f"$text:`{crew_ident.label}`;justify: left;"
 
@@ -1154,10 +1170,20 @@ $t on ship {client_select_ship}
         crew_list = ",".join([p.name for p in crew_people])
         crew_dd = gui_drop_down(f"$text: {crew_choice or 'auto'};list: auto,{crew_list}")
         on gui_message(crew_dd):
+            # BECOMING SOMEBODY ELSE, so their own name and likeness come through the
+            # resolution rather than being copied into this player's answers. Copying them
+            # wrote a ROSTER NAME to a client string - which persists per machine, and is the
+            # one thing this system must never do. Anything they had typed goes with it: they
+            # just said they are somebody else. They can rename on top afterwards.
             crew_choice = crew_dd.value
             crew_pick = crew_pick_for(None, crew_choice, client_id, ship_type_def)
-            crew_name, crew_face, crew_portrait = crew_preview(crew_pick)
+            crew_name = ""
+            crew_face = ""
+            crew_portrait = ""
             crew_ident = console_crew_identity(client_id, client_select_slot, ship_type_def, CONSOLE_SELECT, crew_name, crew_face, crew_portrait, crew_pick)
+            ident_typed = crew_ident.name
+            if ident_input is not None:
+                ident_input.value = crew_ident.name
             ident_pic.value = crew_preview_markdown(crew_ident.face, crew_ident.portrait)
             ident_name.value = f"$text:`{crew_ident.label}`;justify: left;"
 
