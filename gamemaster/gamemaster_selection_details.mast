@@ -18,8 +18,8 @@ priority: 10 # Smaller number is higher priority
 
     on change get_inventory_value(gm, "gamemaster_prev_selection"):
         # if not selected_details.is_hidden:
-        details_text = gm_selected_object_details(gm)
-        selected_details.update(details_text)
+        selected_details_text = gm_selected_object_details(gm)
+        selected_details.update(selected_details_text)
     yield success
 
 #region Selected ship - Beams

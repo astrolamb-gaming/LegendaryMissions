@@ -125,19 +125,19 @@ icon_index: 160
         spawn_button = gui_button("$text:Spawn;justify:center;", data={"lb":glb, "spawn_side_dropdown": spawn_side_dropdown}, on_press=gm_spawn_button_pressed)
 
         gui_row("row-height: 1em;")
-        details = gui_text("$text:Details;","justify: center; background: #123456; click_text:; click_background: #012345;")
-        details_row = gui_row("row-height: content;")
-        details_text = gui_text("$text: No item selected.")
+        details_search = gui_text("$text:Details;","justify: center; background: #123456; click_text:; click_background: #012345;")
+        details_search_row = gui_row("row-height: content;")
+        details_search_text = gui_text("$text: No item selected.")
         on change glb.value:
             item = glb.value
             desc = item.get("long_desc","No description found.")
-            details_text.update(f"$text: {desc}")
+            details_search_text.update(f"$text: {desc}")
         
-        on gui_message(details):
-            if details_row.is_hidden_by_script:
-                gui_show(details_row)
+        on gui_message(details_search):
+            if details_search_row.is_hidden_by_script:
+                gui_show(details_search_row)
             else:
-                gui_hide(details_row)
+                gui_hide(details_search_row)
 
 
     yield success
