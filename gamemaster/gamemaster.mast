@@ -958,23 +958,24 @@ metadata: ```
 type: gm_menu/science
 icon_index: 88
 priority: 96
-```
-    gui_row()
-    gui_text("TODO - science stuff here")
+# ```
+#     gui_row()
+#     gui_text("TODO - science stuff here")
 
-=== gm_old_science
-metadata: ```
-type: gm_menu/science/old_science_selection
-icon_index: 0
-priority: 500
+# === gm_old_science
+# metadata: ```
+# type: gm_menu/science/old_science_selection
+# icon_index: 0
+# priority: 500
 ```
+    gui_row("row-height: 60px;")
+    gui_layout_widget("science_data_tabs")
     gui_row()
     gui_layout_widget("science_data")
     gui_row()
-    gui_layout_widget("science_data_tabs")
-    gui_row()
-    gui_layout_widget("science_data_freq")
-    gui_row()
+
+    # gui_layout_widget("science_data_freq")
+    # gui_row()
     gui_layout_widget("science_sorted_list")
     yield success
 

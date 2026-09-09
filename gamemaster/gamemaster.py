@@ -358,13 +358,13 @@ def layout_item_update_style(item, style):
 def gm_ship_spawn_select_template(item):
     # gui_row("padding:13px;")
     # print(f"{item}")
-    ss = gui_get_variable("set_string")
-    if not ss:
-        if item is None:
-            print("Item is None!")
-        else:
-            print(item)
-        gui_set_variable("set_string",True)
+    # ss = gui_get_variable("set_string")
+    # if not ss:
+    #     if item is None:
+    #         print("Item is None!")
+    #     else:
+    #         print(item)
+    #     gui_set_variable("set_string",True)
     art = item.get("artfileroot", "")
     key = item.get("key","")
     # gui_ship(f"{art}", style="col-width:50px;padding:0,0,5px,0;")
