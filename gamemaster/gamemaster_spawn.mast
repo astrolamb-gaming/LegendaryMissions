@@ -228,3 +228,46 @@ priority: 30 # Smaller number is higher priority
 
     yield success
 #endregion
+
+
+# Temp place for this system
+=== gm_menu_communications
+metadata: ``` yaml
+type: gm_menu/fleets
+icon_index: 11
+icon_color: "blue"
+priority: 40 # Smaller number is higher priority
+```
+    with gui_sub_section():
+        gui_row("row-height: 1.5em;")
+        gui_text("Input text here")
+        gui_row("")
+        gm_in = gui_input("")
+        gui_row("row-height: 1.5em;")
+        send_to_players = gui_button("$text:Send to All Ships")
+
+        gui_row()
+        player_ships = list(role("__player__"))
+        # player_ship_select = gui_list_box(player_ships,"",select=True,multi=True)
+
+        player_ship_select_ = gui_list(player_ships, select=True,multi=True)
+        with player_ship_select_ as id:
+            ship = to_object(id)
+            gui_row("row-height: 1.5em;")
+            gui_text(f"$text:{to_object(ship).name}")
+
+        on change len(role("__player__")):
+            player_ships = list(role("__player__"))
+            player_ship_select_.items = player_ships
+        
+        gui_row("row-height: 1.5em;")
+        send_to_selected = gui_button("$text:Send to Selected;")
+        on gui_message(send_to_selected):
+            print(len(player_ship_select_.get_selected()))
+
+    # TODO: Add a means of saving messages to send later.
+
+
+    yield success
+
+
