@@ -233,18 +233,68 @@ priority: 30 # Smaller number is higher priority
 # Temp place for this system
 === gm_menu_communications
 metadata: ``` yaml
-type: gm_menu/fleets
+type: gm_menu/comms
 icon_index: 11
 icon_color: "blue"
 priority: 40 # Smaller number is higher priority
 ```
     with gui_sub_section():
+
+        # From
         gui_row("row-height: 1.5em;")
-        gui_text("Input text here")
+        gui_text("$text: Send Message to Player Ship(s)")
+        gui_row("row-height: 1.2em;")
+        gui_text("$text:Specify Origin:;")
+        gui_row("row-height: 1.5em;")
+        from_search_bar = gui_input("")
+        from_list_box_row = gui_row()
+
+        from_options = to_object_list(any_role("lifeform,__npc__,station,fighter"))
+        from_list_box = gui_list(from_options,select=True)
+        print(from_options)
+        with from_list_box as id:
+            obj = to_object(id)
+            # gui_row("row-height: 1em;")
+            if has_role(obj, "station"):
+                gui_icon("icon_index: 114;color: #555555")
+            elif has_role(obj, "lifeform"):
+                gui_icon("icon_index: 83; color: green;")
+            else:
+                gui_icon("icon_index: 140; color: blue;")
+            gui_text(f"{obj.name}")
+            # gui_text(f"$text:")
+        
+        on change from_search_bar.value:
+            from_options = to_object_list(any_role("lifeform,__npc__,station,fighter"))
+            val = from_search_bar.value
+            # items = ~~[item for item in from_options if item.name in val]~~
+            print(val)
+            # items = list(filter(lambda item: item.name in val, from_options))
+            items = list()
+            for item in from_options:
+                if val.lower().strip() in item.name.lower():
+                    items.append(item)
+            print(len(items))
+            from_list_box.listbox.items = items
+            # gui_represent(from_list_box_row)
+            print(from_options)
+
+        on change from_list_box.listbox.value:
+            sel = from_list_box.listbox.value
+            print(f"Selected: {sel}")
+            # item = to_object(sel)
+            if sel is not None:
+                from_search_bar.value = sel.name
+                print("Item is NOT None")
+            else:
+                print("item is None\nOn Change from_list_box.get_selected()")
+            
+        # Message
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text: Input message here:")
         gui_row("")
         gm_in = gui_input("")
-        gui_row("row-height: 1.5em;")
-        send_to_players = gui_button("$text:Send to All Ships")
 
         gui_row()
         player_ships = list(role("__player__"))
@@ -253,7 +303,7 @@ priority: 40 # Smaller number is higher priority
         player_ship_select_ = gui_list(player_ships, select=True,multi=True)
         with player_ship_select_ as id:
             ship = to_object(id)
-            gui_row("row-height: 1.5em;")
+            # gui_row("row-height: 1.5em;")
             gui_text(f"$text:{to_object(ship).name}")
 
         on change len(role("__player__")):
@@ -262,8 +312,29 @@ priority: 40 # Smaller number is higher priority
         
         gui_row("row-height: 1.5em;")
         send_to_selected = gui_button("$text:Send to Selected;")
+        
+        gui_row("row-height: 1.5em;")
+        send_to_players = gui_button("$text: Send to All Ships")
+
         on gui_message(send_to_selected):
-            print(len(player_ship_select_.get_selected()))
+            # print(len(player_ship_select_.get_selected()))
+            _from = from_list_box.listbox.value
+            if _from is None:
+                yield fail
+            # send_comms_message_to_player_ship(player_ship_select_.value, _from, "",title,"blue",message,"blue")
+            msg = gm_in.value
+            to = player_ship_select_.get_selected()
+            print(f"Sending msg to: {to}")
+            comms_message(msg, _from, to)
+
+        on gui_message(send_to_players):
+            print("Sending to all players")
+            _from = from_list_box.listbox.value
+            if _from is None:
+                yield fail
+            msg = gm_in.value
+            to = role("__player__")
+            comms_message(msg, _from, to)
 
     # TODO: Add a means of saving messages to send later.
 
