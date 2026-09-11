@@ -291,10 +291,32 @@ priority: 40 # Smaller number is higher priority
             
         # Message
 
-        gui_row("row-height: 1.5em;")
+        gui_row("row-height: 1.2em;")
         gui_text("$text: Input message here:")
-        gui_row("")
-        gm_in = gui_input("")
+        load_button = gui_icon_button("icon_index: 92;")
+        gui_text("$text:Load;")
+        message_input_section = gui_row("")
+        # message_input_section = gui_sub_section()
+        gm_in = None
+        # with message_input_section:
+        with gui_sub_section():
+            gm_in = gui_input("")
+        
+        
+        message_load_section = gui_row()
+        gm_load_messsage_lb = None
+        with gui_sub_section():
+            items = gui_get_variable("gm_saved_messages",list())
+            gm_load_message_lb = gui_list_box(items,"",select=True)
+            gui_row("row-height: 1.2em;")
+            cancel_msg_select_button = gui_button("Cancel")
+            on gui_message(cancel_msg_select_button):
+                gui_hide(message_load_section)
+                gui_show(message_input_section)
+
+        on gui_message(load_button):
+            gui_hide(message_input_section)
+            gui_show(message_load_section)
 
         gui_row()
         player_ships = list(role("__player__"))
@@ -310,10 +332,10 @@ priority: 40 # Smaller number is higher priority
             player_ships = list(role("__player__"))
             player_ship_select_.items = player_ships
         
-        gui_row("row-height: 1.5em;")
+        gui_row("row-height: 1.2em;")
         send_to_selected = gui_button("$text:Send to Selected;")
         
-        gui_row("row-height: 1.5em;")
+        gui_row("row-height: 1.2em;")
         send_to_players = gui_button("$text: Send to All Ships")
 
         on gui_message(send_to_selected):
@@ -335,6 +357,15 @@ priority: 40 # Smaller number is higher priority
             msg = gm_in.value
             to = role("__player__")
             comms_message(msg, _from, to)
+
+        gui_row("row-height: 1.2em;")
+        gui_icon("icon_index: 94;")
+        save_button = gui_button("$text:Save For Later")
+        on gui_message(save_button):
+            msg = gm_in.value
+            message_list = gui_get_variable("gm_saved_messages",list())
+            message_list.append(msg)
+            gui_set_variable("gm_saved_message", message_list)
 
     # TODO: Add a means of saving messages to send later.
 
