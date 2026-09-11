@@ -211,6 +211,9 @@ priority: 30 # Smaller number is higher priority
     origins = sorted(origins, key=str.casefold)
 
     with gui_sub_section():
+        gui_row("row-height: 1.5em;")
+        gui_text("$text: Spawn Fleets")
+        gui_row("margin: 3px;")
         fleet_lb = gui_list_box(origins, "", select=True)
 
         gui_row("row-height: 2em;")
@@ -235,7 +238,7 @@ priority: 30 # Smaller number is higher priority
 metadata: ``` yaml
 type: gm_menu/comms
 icon_index: 11
-icon_color: "blue"
+icon_color: "#404ad8"
 priority: 40 # Smaller number is higher priority
 ```
     with gui_sub_section():
@@ -251,7 +254,7 @@ priority: 40 # Smaller number is higher priority
 
         from_options = to_object_list(any_role("lifeform,__npc__,station,fighter"))
         from_list_box = gui_list(from_options,select=True)
-        print(from_options)
+        # print(from_options)
         with from_list_box as id:
             obj = to_object(id)
             # gui_row("row-height: 1em;")
@@ -268,20 +271,20 @@ priority: 40 # Smaller number is higher priority
             from_options = to_object_list(any_role("lifeform,__npc__,station,fighter"))
             val = from_search_bar.value
             # items = ~~[item for item in from_options if item.name in val]~~
-            print(val)
+            # print(val)
             # items = list(filter(lambda item: item.name in val, from_options))
             items = list()
             for item in from_options:
                 if val.lower().strip() in item.name.lower():
                     items.append(item)
-            print(len(items))
+            # print(len(items))
             from_list_box.listbox.items = items
             # gui_represent(from_list_box_row)
             print(from_options)
 
         on change from_list_box.listbox.value:
             sel = from_list_box.listbox.value
-            print(f"Selected: {sel}")
+            # print(f"Selected: {sel}")
             # item = to_object(sel)
             if sel is not None:
                 from_search_bar.value = sel.name
@@ -291,10 +294,16 @@ priority: 40 # Smaller number is higher priority
             
         # Message
 
-        gui_row("row-height: 1.2em;")
-        gui_text("$text: Input message here:")
+        # Load
+        gui_row("row-height: 1.5em;background: #123456;")
+        gui_text("$text: Input message here:","col-width: content;")
+        gui_blank()
         load_button = gui_icon_button("icon_index: 92;")
-        gui_text("$text:Load;")
+        save_button = gui_icon_button("icon_index: 94;")
+        # save_button = gui_button("$text:Save For Later")
+        
+        # Message entry
+
         message_input_section = gui_row("")
         # message_input_section = gui_sub_section()
         gm_in = None
@@ -314,10 +323,37 @@ priority: 40 # Smaller number is higher priority
                 gui_hide(message_load_section)
                 gui_show(message_input_section)
 
+        gui_hide(message_load_section)
+
         on gui_message(load_button):
+            print("Load button pressed")
+            message_list = gui_get_variable("gm_saved_messages",list())
+            print(message_list)
+            gm_load_message_lb.items = message_list
             gui_hide(message_input_section)
             gui_show(message_load_section)
 
+        on gui_message(save_button):
+            print("Save button pressed")
+            msg = gm_in.value
+            print(msg)
+            message_list = gui_get_variable("gm_saved_messages",list())
+            print(message_list)
+            message_list.append(msg)
+            print(message_list)
+            gui_set_variable("gm_saved_messages", message_list)
+
+        on change gm_load_message_lb.value:
+            selection = gm_load_message_lb.value
+            if selection is None:
+                yield fail
+            gm_in.value = selection
+            gm_load_message_lb.value = None
+            gui_hide(message_load_section)
+            gui_show(message_input_section)
+
+        gui_row("row-height: 1.2em;background: #123456;")
+        gui_text("Select Target Ships")
         gui_row()
         player_ships = list(role("__player__"))
         # player_ship_select = gui_list_box(player_ships,"",select=True,multi=True)
@@ -332,10 +368,10 @@ priority: 40 # Smaller number is higher priority
             player_ships = list(role("__player__"))
             player_ship_select_.items = player_ships
         
-        gui_row("row-height: 1.2em;")
+        gui_row("row-height: 1.2em;background: #123456;")
         send_to_selected = gui_button("$text:Send to Selected;")
         
-        gui_row("row-height: 1.2em;")
+        gui_row("row-height: 1.2em;background: #123456;")
         send_to_players = gui_button("$text: Send to All Ships")
 
         on gui_message(send_to_selected):
@@ -358,14 +394,7 @@ priority: 40 # Smaller number is higher priority
             to = role("__player__")
             comms_message(msg, _from, to)
 
-        gui_row("row-height: 1.2em;")
-        gui_icon("icon_index: 94;")
-        save_button = gui_button("$text:Save For Later")
-        on gui_message(save_button):
-            msg = gm_in.value
-            message_list = gui_get_variable("gm_saved_messages",list())
-            message_list.append(msg)
-            gui_set_variable("gm_saved_message", message_list)
+        
 
     # TODO: Add a means of saving messages to send later.
 
