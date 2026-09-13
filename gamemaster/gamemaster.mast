@@ -1034,8 +1034,8 @@ priority: 99
 
         # Allow GM to enforce a time limit
         gui_row("row-height: 1em;")
-        gui_text("$text:Set Time Limit: ;")
-        time = gui_input("msg: Time Limit;", "col-width: content;", var="gm_set_time_limit")
+        gui_text("$text:Set Time Limit: ;","col-width: content;")
+        time = gui_input("msg: Time Limit;", "", var="gm_set_time_limit")
         gui_row("row-height: 1em;")
         limit = gui_button("Time limit")
         on gui_message(limit):
@@ -1051,7 +1051,7 @@ priority: 99
             clear_timer(SHARED, "time_limit")
             gui_hide(time_remaining_sub_section)
         gui_row("row-height: 1em;")
-        eb = gui_button("End Game")
+        eb = gui_button(" End Game","background-color:red;")
         on gui_message(eb):
             # clear_timer(SHARED, "time_limit")
             # jump task_end_game
