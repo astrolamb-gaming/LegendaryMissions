@@ -275,11 +275,17 @@ ship_id:
     yield fail if ship_id is None
     old_fleet = get_inventory_value(ship_id, "my_fleet_id")
     fleet_remove(old_fleet, ship_id)
+    
 
     pos = get_pos(ship_id)
     role_list = get_role_string(ship_id)
+    side = to_object(ship_id).side
+
+    f_roles = side + get_role_string(old_fleet)
+
+    fleet = await prefab_spawn(prefab_fleet_empty, data={"side_value": side, "fleet_roles": f_roles, "START_X": pos.x, "START_Y": pos.y, "START_Z":pos.z})
     
-    fleet = fleet_spawn(pos, role_list)
-    fleet.side = to_object(old_fleet).side
+    # fleet = fleet_spawn(pos, role_list)
+    # fleet.side = to_object(old_fleet).side
     fleet_add(fleet, ship_id)
 

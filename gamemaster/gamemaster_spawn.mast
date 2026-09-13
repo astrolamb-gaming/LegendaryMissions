@@ -216,18 +216,34 @@ priority: 30 # Smaller number is higher priority
         gui_row("margin: 3px;")
         fleet_lb = gui_list_box(origins, "", select=True)
 
-        gui_row("row-height: 2em;")
+        gui_row("row-height: 1.5em;")
         gui_text("$text:Fleet Difficulty:;")
         default DIFFICULTY = 5
         spawn_diff_dd = gui_drop_down("$text:{DIFFICULTY};list:1,2,3,4,5,6,7,8,9,10,11;")
+        
+        gui_row("row-height: min-content;")
+        gui_text("$text:Spawn Side:;justify:center;")
+        spawn_side_dropdown = gui_drop_down("$text:Hostile;list:Hostile,Allied,Neutral,Origin;")
+
         gui_row("row-height: 2em;")
         spawn_fleet_button = gui_button("Spawn Fleet")
         on gui_message(spawn_fleet_button):
             race = fleet_lb.value
+            side = spawn_side_dropdown.value
+            if side == "Hostile":
+                side = "raider"
+            elif side == "Allied":
+                side = "tsn"
+            elif side == "Origin":
+                side = race
+            else:
+                side = "civilian"
             diff = int(spawn_diff_dd.value)
             cambot = sbs.get_ship_of_client(client_id)
             pos = gamemaster_get_pos(cambot, "lmb")
-            fleet = prefab_spawn(prefab_fleet_raider, data={"race": race, "fleet_difficulty": diff}, OFFSET_X=pos.x, OFFSET_Y=pos.y, OFFSET_Z=pos.z)
+            # TODO: prefab_fleet_raider doesn't spawn Terran ships, possibly others as well.
+            # Need a generic prefab_fleet for any race/side
+            fleet = prefab_spawn(prefab_fleet_raider, data={"race": race, "ship_roles":side,"fleet_difficulty": diff}, OFFSET_X=pos.x, OFFSET_Y=pos.y, OFFSET_Z=pos.z)
 
     yield success
 #endregion
