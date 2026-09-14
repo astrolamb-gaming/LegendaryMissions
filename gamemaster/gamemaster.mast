@@ -853,13 +853,15 @@ ship: None
 
         gamemaster_show_nav_area(SCIENCE_ORIGIN_ID, pos, 0, "Game Master", "lmb", "#040")
 
+        # We use this here because "gm_selection" CAN be None, while "gamemaster_prev_selection" should be the last selected object.
+        gui_set_variable("gm_selection", SCIENCE_SELECTED_ID)
+
         obj = to_object(SCIENCE_SELECTED_ID)
         if obj is None:
             jump END
         if has_role(SCIENCE_SELECTED_ID, "gamemaster"):
             ->END
         
-        gui_set_variable("gm_selection", SCIENCE_SELECTED_ID)
         set_inventory_value(SCIENCE_ORIGIN_ID, "gamemaster_prev_selection", SCIENCE_SELECTED_ID)
         
         prev_comms = get_comms_selection(SCIENCE_ORIGIN_ID)

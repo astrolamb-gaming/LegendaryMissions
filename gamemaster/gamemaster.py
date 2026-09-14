@@ -47,6 +47,41 @@ def gamemaster_show_nav_area(ORIGIN_ID, pos, size_delta, text, selection_type, c
     nav.visibleToShip = ORIGIN_ID
     set_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SELECT_ID", nav_id)
 
+def gamemaster_move_nav_area(ORIGIN_ID, pos, size_delta=0, selection_type="lmb"):
+    """
+    Move a nav area without changing text or color, and only changing the size if desired.
+    """
+    x = pos.x
+    y = pos.z
+    text = "Game Master"
+    color = "#040" #green
+
+    # navarea.
+
+    sim = FrameContext.context.sim
+
+    size = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SIZE", 5000)
+    size += size_delta
+
+    set_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SIZE", size)
+    set_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_x", x)
+    set_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_y", y)
+    
+    nav_id = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SELECT_ID", None)
+
+    if nav_id:
+        text = nav_id.text
+        color = nav_id.color
+        sim.delete_navpoint_by_id(nav_id)
+
+
+    nav_id = sim.add_navarea(x-size, y-size,x+size, y-size,x-size, y+size,x+size, y+size, text, color)
+    nav = sim.get_navpoint_by_id(nav_id)
+
+    nav.visibleToShip = ORIGIN_ID
+    set_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SELECT_ID", nav_id)
+    
+
 def gamemaster_get_pos(ORIGIN_ID, selection_type):
     x = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_x", 0)
     y = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_y", 0)
