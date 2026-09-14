@@ -901,34 +901,7 @@ ship: None
 
 # NOTE: For gm menu priorities, main menu priority should be less than 100, sub menu priority should be 100 or greater.
 # This will prevent (admittedly minor) issues with the order of the main menu's default contents if it has submenus toos.
-=== gm_menu_terrain
-metadata: ``` yaml
-type: gm_menu/terrain
-icon_index: Terrain 
-icon_color: "#999872"
-priority: 80 # Smaller number is higher priority
-```
-    debug_print("Terrain")
-    gui_row("row-height: 5;")
-    gui_button("Testing terrain")
-    gui_row()
-    gui_blank()
-    yield success
 
-=== gm_menu_terrain_asteroids
-metadata: ``` yaml
-type: gm_menu/terrain/asteroids
-icon_index: 54
-icon_color: "#5c3b18"
-priority: 100 # Smaller number is higher priority
-```
-    # sec = gui_sub_section()
-    # with sec:
-    debug_print("Spawn button")
-    gui_button("Spawn Asteroids")
-    gui_row()
-    gui_blank()
-    yield success
 
 
 

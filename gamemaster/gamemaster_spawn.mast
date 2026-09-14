@@ -249,6 +249,121 @@ priority: 30 # Smaller number is higher priority
 #endregion
 
 
+#region Terrain Spawning
+=== gm_menu_terrain
+metadata: ``` yaml
+type: gm_menu/terrain
+icon_index: Terrain 
+icon_color: "#999872"
+priority: 80 # Smaller number is higher priority
+```
+    with gui_sub_section():
+        debug_print("Terrain")
+        gui_row("row-height: 1.5em;")
+        gui_button("Terrain Spawn Settings")
+        gui_row("row-height: 0.5em; background-color: #777777;")
+        gui_blank()
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Density;","col-width: min-content;")
+        density = gui_slider("low:0;high:100;text:float;")
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Shape:;","col-width: content;")
+        shapes = ["sphere","ellipse","square"]
+        # shape = gui_drop_down()
+
+        shape_list = gui_list(shapes)
+        with shapes as shape:
+            gui_text(f"$text:{shape}")
+        
+
+        gui_row()
+        gui_blank()
+        gui_row("row-height: 1.5em;")
+        spawn_asteroid_button = gui_button("$text:Spawn Asteroids")
+        gui_row("row-height: 1.5em;")
+        spawn_nebula_button = gui_button("Spawn Nebulae")
+
+        on gui_message(spawn_asteroid_button):
+            prefab_spawn(prefab_terrain_asteroid_box)
+
+    yield success
+
+=== gm_menu_terrain_planets
+metadata: ``` yaml
+type: gm_menu/terrain/planets
+icon_index: 13
+icon_color: "#5c3b18"
+priority: 100 # Smaller number is higher priority
+```
+    # sec = gui_sub_section()
+    # with sec:
+    debug_print("Spawn button")
+    gui_button("Spawn Asteroids")
+    gui_row()
+    gui_blank()
+    yield success
+#endregion
+
+=== gm_menu_terrain_other
+metadata: ```
+type: gm_menu/terrain/other
+icon_index: 7
+icon_color: " #000000"
+priority: 200
+```
+    with gui_sub_section():
+        default gravity_radius = 5000
+        default gravity_strength = 4.0
+        default turbulence_strength = 2.0
+        default collision_damage=200
+
+        gui_row("row-height: 1.5em;")
+        bh_name = gui_input("$text:;desc: Name;")
+
+        gui_row("row-height: 1.5em;")
+        gravity_radius_input = gui_input("$text:5000;desc:Gravity Radius;")
+
+        gui_row("row-height: 1.5em;")
+        gravity_strength_input = gui_input("$text:4.0;desc: Gravity Strength;")
+
+        gui_row("row-height: 1.5em;")
+        turbulence_strength_input = gui_input("$text:2.0;desc: Turbulence Strength;")
+
+        gui_row("row-height: 1.5em;")
+        collision_damage_input = gui_input("$text:200;desc: Collision Damage;")
+
+        gui_row("row-height: 1.5em;")
+        spawn_black_hole = gui_button("Spawn Black Hole")
+        
+        on gui_message(spawn_black_hole):
+            gravity_radius = safe_int(gravity_radius_input.value, 5000)
+            gravity_strength = safe_int(gravity_strength_input.value, 4.0)
+            turbulence_strength = safe_int(turbulence_strength_input.value, 2.0)
+            collision_damage = safe_int(collision_damage_input.value, 200)
+
+            gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
+            if gm is None:
+                debug_print("gm object is None")
+                jump END
+            pos = gamemaster_get_pos(gm, "lmb")
+
+            debug_print(pos)
+            pos.x = safe_int(pos.x)
+            pos.y = safe_int(pos.y)
+            pos.z = safe_int(pos.z)
+            prefab_spawn(prefab_black_hole,data={"START_X": pos.x, "START_Y": pos.y, "START_Z": pos.z})
+
+            # bh = await prefab_spawn(prefab_black_hole, data={"gravity_radius": gravity_radius, "gravity_strength": gravity_strength, "turbulence_strength": turbulence_strength, "collision_damage": collision_damage, "START_X": pos.x, "START_Y": pos.y, "START_Z": pos.z})
+
+        gui_row()
+        gui_blank()
+
+    yield success
+
+
+
 # Temp place for this system
 === gm_menu_communications
 metadata: ``` yaml
@@ -421,11 +536,6 @@ priority: 40 # Smaller number is higher priority
             msg = gm_in.value
             to = role("__player__")
             comms_message(msg, _from, to)
-
-        
-
-    # TODO: Add a means of saving messages to send later.
-
 
     yield success
 

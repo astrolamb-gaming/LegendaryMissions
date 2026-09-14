@@ -1,5 +1,6 @@
 === prefab_terrain_asteroid_box
 metadata: ``` yaml
+type: prefab/terrain/asteroid/box
 display_text: Asteroid box
 ```
     default density_scale = terrain_to_value(TERRAIN_SELECT)
@@ -10,6 +11,7 @@ display_text: Asteroid box
 
 === prefab_terrain_asteroid_polyline
 metadata: ``` yaml
+type: prefab/terrain/asteroid/polyline
 display_text: Asteroid sphere
 density_scale: 1
 ```
@@ -24,6 +26,7 @@ density_scale: 1
 
 === prefab_terrain_asteroid_sphere
 metadata: ``` yaml
+type: prefab/terrain/asteroid/sphere
 display_text: Asteroid sphere
 ```
     default density_scale =  terrain_to_value(TERRAIN_SELECT)
@@ -34,6 +37,7 @@ display_text: Asteroid sphere
 
 === prefab_terrain_nebula_box
 metadata: ``` yaml
+type: prefab/terrain/nebula/box
 display_text: Nebula box
 ```
     default cluster_color = None
@@ -46,6 +50,7 @@ display_text: Nebula box
 
 === prefab_terrain_nebula_sphere
 metadata: ``` yaml
+type: prefab/terrain/nebula/sphere
 display_text: Nebula sphere
 ```
     default cluster_color = None
@@ -59,6 +64,7 @@ display_text: Nebula sphere
 
 === prefab_planetoid
 metadata: ``` yaml
+type: prefab/terrain/planet/planetoid
 display_text: Nebula sphere
 ```
     co = terrain_spawn(START_X, START_Y, START_Z, None, "#,gasgiant", "planet", "behav_planet")
@@ -94,6 +100,7 @@ display_text: Nebula sphere
 
 === prefab_gas_giant
 metadata: ``` yaml
+type: prefab/terrain/planet/gas_giant
 display_text: Gas giant (dockable)
 planet_radius: 4000
 ```
@@ -139,13 +146,16 @@ planet_radius: 4000
 
 ==== prefab_black_hole
 metadata: ```
-type: prefab/black_hole
+type: prefab/terrain/black_hole
 display_text: Black Hole
 ``` 
     default gravity_radius = 5000
     default gravity_strength = 4.0
     default turbulence_strength = 2.0
     default collision_damage=200
+
+    debug_print(f"x: {START_X}, y: {START_Y}, z: {START_Z}")
+    # yield success
 
     bh = terrain_spawn_black_hole(START_X,START_Y,START_Z, gravity_radius, gravity_strength, turbulence_strength, collision_damage)
     yield result bh.id
