@@ -154,8 +154,5 @@ display_text: Black Hole
     default turbulence_strength = 2.0
     default collision_damage=200
 
-    debug_print(f"x: {START_X}, y: {START_Y}, z: {START_Z}")
-    # yield success
-
     bh = terrain_spawn_black_hole(START_X,START_Y,START_Z, gravity_radius, gravity_strength, turbulence_strength, collision_damage)
     yield result bh.id

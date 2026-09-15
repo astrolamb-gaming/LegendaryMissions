@@ -320,7 +320,7 @@ priority: 200
         default collision_damage=200
 
         gui_row("row-height: 1.5em;")
-        bh_name = gui_input("$text:;desc: Name;")
+        bh_name = gui_input("$text:;desc: Naming Black Holes Is Not Currently Functional;")
 
         gui_row("row-height: 1.5em;")
         gravity_radius_input = gui_input("$text:5000;desc:Gravity Radius;")
@@ -349,13 +349,13 @@ priority: 200
                 jump END
             pos = gamemaster_get_pos(gm, "lmb")
 
-            debug_print(pos)
-            pos.x = safe_int(pos.x)
-            pos.y = safe_int(pos.y)
-            pos.z = safe_int(pos.z)
-            prefab_spawn(prefab_black_hole,data={"START_X": pos.x, "START_Y": pos.y, "START_Z": pos.z})
+            bh = await prefab_spawn(prefab_black_hole, data={"gravity_radius": gravity_radius, "gravity_strength": gravity_strength, "turbulence_strength": turbulence_strength, "collision_damage": collision_damage, "START_X": pos.x, "START_Y": pos.y, "START_Z": pos.z})
 
-            # bh = await prefab_spawn(prefab_black_hole, data={"gravity_radius": gravity_radius, "gravity_strength": gravity_strength, "turbulence_strength": turbulence_strength, "collision_damage": collision_damage, "START_X": pos.x, "START_Y": pos.y, "START_Z": pos.z})
+            #TODO: It seems that black holes currently can't have names.... lame.
+            # name = bh_name.value
+            # obj = to_object(bh)
+            # if name is not None and obj is not None:
+            #     obj.set_name(name)
 
         gui_row()
         gui_blank()

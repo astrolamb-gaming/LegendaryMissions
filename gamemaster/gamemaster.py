@@ -1,3 +1,4 @@
+from sbs_utils.mast.mast_globals import debug_print
 from sbs_utils.procedural.style import apply_control_styles
 from sbs_utils.agent import Agent
 from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
@@ -82,9 +83,18 @@ def gamemaster_move_nav_area(ORIGIN_ID, pos, size_delta=0, selection_type="lmb")
     set_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SELECT_ID", nav_id)
     
 
-def gamemaster_get_pos(ORIGIN_ID, selection_type):
+def gamemaster_get_pos(ORIGIN_ID, selection_type="lmb"):
+    """
+    Get the position of the gamemaster's selection.
+    Args:
+        ORIGIN_ID (int): the gamemaster "ship"
+        selection_type (str): The button click used (left or right). "lmb" or "rmb" standing for "left/right mouse button". Default is "lmb".
+    """
     x = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_x", 0)
-    y = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_y", 0)
+    # The more user-intuitive "y" is used for the inventory key, but it's actually "z"
+    z = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_y", 0)
+
+    y = 1
 
     _other = 0
     if selection_type == "rmb":
@@ -93,11 +103,15 @@ def gamemaster_get_pos(ORIGIN_ID, selection_type):
         _other = get_science_selection(ORIGIN_ID)
 
     if _other==0:
-        return Vec3(x,0,y)
+        return Vec3(x,y,z)
     _obj = to_object(_other)
     if _obj is None:
-        return Vec3(x,0,y)
-    return _obj.pos
+        return Vec3(x,y,z)
+
+    # While the object's vertical axis value might be one value, we increase it by 1 to avoid issues with black holes. Minimal effect on anything else.
+    v = Vec3(_obj.pos)
+    v.y = v.y + 1
+    return v
     
 
     
