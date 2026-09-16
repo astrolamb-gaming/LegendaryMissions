@@ -159,7 +159,7 @@ icon_index: 160
     elif side_option == "Hostile":
         spawn_side = "raider" # For now
     else:
-        spawn_side = "civilian"
+        spawn_side = "civ"
     spawn_roles = selection.get("roles","")
     # art = selection.get("artfileroot")
     art = selection.get("key")
@@ -237,7 +237,7 @@ priority: 30 # Smaller number is higher priority
             elif side == "Origin":
                 side = race
             else:
-                side = "civilian"
+                side = "civ"
             diff = int(spawn_diff_dd.value)
             cambot = sbs.get_ship_of_client(client_id)
             pos = gamemaster_get_pos(cambot, "lmb")
@@ -247,6 +247,73 @@ priority: 30 # Smaller number is higher priority
 
     yield success
 #endregion
+
+#region Station Spawning
+=== gm_menu_stations
+metadata: ```
+type: gm_menu/station
+icon_index: Station
+icon_color: white
+priority: 40
+```
+    with gui_sub_section():
+        gui_row("row-height: 1.5em;")
+        gui_text("Station Spawn Settings")
+        gui_row("row-height: 0.5em; background-color: #122048;")
+        gui_blank()
+
+        gui_row("row-height: min-content;")
+        gui_text("$text:Spawn Side:;justify:center;")
+        station_spawn_side_dropdown = gui_drop_down("$text:Allied;list:Hostile,Allied,Neutral,Origin;")
+
+        gui_row("row-height: 1em;")
+        gui_text("$text:")
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Station Type:;","col-width: content;")
+
+        station_prefabs = labels_get_type("prefab/npc/station")
+
+        gui_row()
+        station_type_list = gui_list(station_prefabs, select=True)
+        with station_type_list as prefab:
+            display_text = prefab.get_inventory_value("display_text")
+            if display_text is None:
+                display_text = prefab.get_inventory_value("type").replace("prefab/npc/station/","")
+            gui_text(f"$text:{display_text};","background-color: #123123")
+        station_type_list.set_selected_index(0)
+
+        gui_row("row-height: 1.5em;")
+        station_name_input = gui_input("$text:;desc:Station Name;")
+        
+        gui_row("row-height: 1.5em;")
+        spawn_station_button = gui_button("$text:Spawn Station")
+
+        on gui_message(spawn_station_button):
+
+            side = station_spawn_side_dropdown.value
+            if side == "Hostile":
+                side = "raider"
+            elif side == "Allied":
+                side = "tsn"
+            elif side == "Origin":
+                side = race
+            else:
+                side = "civ"
+
+            gm = sbs.get_ship_of_client(client_id)
+            pos = gamemaster_get_pos(gm)
+            size = gamemaster_get_size(gm)
+            lbl = station_type_list.listbox.value
+            station_name = station_name_input.value
+            # Will use the default "DS X" if None
+            if station_name == "":
+                station_name = None
+            data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"name":station_name, "side_value":side}
+            prefab_spawn(lbl, data=data)
+    yield success
+#endregion
+
 
 
 #region Terrain Spawning
@@ -306,7 +373,7 @@ metadata: ``` yaml
 type: gm_menu/terrain/nebula
 icon_index: 44
 icon_color: "#95357d"
-priority: 90 # Smaller number is higher priority
+priority: 300 # Smaller number is higher priority
 ```
     with gui_sub_section("background-color: #95357d22;"):
         gui_row("row-height: 1.5em;")
@@ -372,7 +439,7 @@ metadata: ``` yaml
 type: gm_menu/terrain/planets
 icon_index: 13
 icon_color: "#5c3b18"
-priority: 100 # Smaller number is higher priority
+priority: 400 # Smaller number is higher priority
 ```
     with gui_sub_section():
 
@@ -431,7 +498,7 @@ metadata: ```
 type: gm_menu/terrain/other
 icon_index: 7
 icon_color: " #000000"
-priority: 200
+priority: 500
 ```
     with gui_sub_section():
         default gravity_radius = 5000
