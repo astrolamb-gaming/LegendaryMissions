@@ -258,37 +258,114 @@ icon_color: "#999872"
 priority: 80 # Smaller number is higher priority
 ```
     with gui_sub_section():
-        debug_print("Terrain")
         gui_row("row-height: 1.5em;")
-        gui_button("Terrain Spawn Settings")
-        gui_row("row-height: 0.5em; background-color: #777777;")
+        gui_text("Asteroid Spawn Settings")
+        gui_row("row-height: 0.5em; background-color: #122048;")
         gui_blank()
 
         gui_row("row-height: 1.5em;")
-        gui_text("$text:Density;","col-width: min-content;")
-        density = gui_slider("low:0;high:100;text:float;")
+        gui_text("$text:Density;")
+        # gui_blank()
+        asteroid_use_default_density = gui_checkbox("$text:Use Default;")
+
+        gui_row("row-height: 1.5em;")
+        asteroid_density = gui_slider("low:0;high:100;text:float;")
+        
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Shape:;","col-width: content;")
+
+        asteroid_prefabs = labels_get_type("prefab/terrain/asteroid")
+
+        gui_row()
+        asteroid_shape_list = gui_list(asteroid_prefabs, select=True)
+        with asteroid_shape_list as prefab:
+            display_text = prefab.get_inventory_value("display_text")
+            if display_text is None:
+                display_text = prefab.get_inventory_value("type").replace("prefab/terrain/","").replace("asteroid/","").replace("nebula/","")
+            gui_text(f"$text:{display_text};","background-color: #123123")
+        asteroid_shape_list.set_selected_index(0)
+        
+        gui_row("row-height: 1.5em;")
+        spawn_asteroid_button = gui_button("$text:Spawn Asteroids")
+
+        on gui_message(spawn_asteroid_button):
+            gm = sbs.get_ship_of_client(client_id)
+            pos = gamemaster_get_pos(gm)
+            size = gamemaster_get_size(gm)
+            lbl = asteroid_shape_list.listbox.value
+            if not asteroid_use_default_density.value:
+                data={"density_scale":asteroid_density.value,"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size}
+            else:
+                data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size}
+            prefab_spawn(lbl, data=data)
+
+    yield success
+
+=== gm_menu_terrain_nebulae
+metadata: ``` yaml
+type: gm_menu/terrain/nebula
+icon_index: 44
+icon_color: "#95357d"
+priority: 90 # Smaller number is higher priority
+```
+    with gui_sub_section("background-color: #95357d22;"):
+        gui_row("row-height: 1.5em;")
+        gui_text("Nebula Spawn Settings")
+        gui_row("row-height: 0.5em; background-color: #122048;")
+        gui_blank()
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Density;")
+        nebula_use_default_density = gui_checkbox("$text:Use Default;")
+
+        gui_row("row-height: 1.5em;")
+        nebula_density = gui_slider("low:0;high:100;text:int;")
+
+        gui_row("row-height: 1.5em;")
+        color_list = ["purple","red","blue","yellow","green","orange","white","custom"]
+        nebula_color_dd = gui_drop_down(f"$text:purple;list:{','.join(color_list)};")
+        
+        gui_row("row-height: 1.5em;")
+        on gui_message(gui_button("Test DD")):
+            nebula_color_dd.value = "#123456"
 
         gui_row("row-height: 1.5em;")
         gui_text("$text:Shape:;","col-width: content;")
-        shapes = ["sphere","ellipse","square"]
-        # shape = gui_drop_down()
 
-        shape_list = gui_list(shapes)
-        with shapes as shape:
-            gui_text(f"$text:{shape}")
-        
+        nebula_prefabs = labels_get_type("prefab/terrain/nebula")
 
         gui_row()
-        gui_blank()
-        gui_row("row-height: 1.5em;")
-        spawn_asteroid_button = gui_button("$text:Spawn Asteroids")
-        gui_row("row-height: 1.5em;")
-        spawn_nebula_button = gui_button("Spawn Nebulae")
+        nebula_shape_list = gui_list(nebula_prefabs, select=True)
+        with nebula_shape_list as prefab:
+            display_text = prefab.get_inventory_value("display_text")
+            if display_text is None:
+                display_text = prefab.get_inventory_value("type").replace("prefab/terrain/","").replace("asteroid/","").replace("nebula/","")
+            gui_text(f"$text:{display_text}")
+        nebula_shape_list.set_selected_index(0)
 
-        on gui_message(spawn_asteroid_button):
-            prefab_spawn(prefab_terrain_asteroid_box)
+        gui_row("row-height: 1.5em;")
+        neb_use_marker = gui_checkbox("$text:Use Marker;")
+        gui_row("row-height: 1.5em;")
+        nebula_name_input = gui_input("$text:;desc:Nebulae Name;")
+        
+        gui_row("row-height: 1.5em;")
+        spawn_nebula_button = gui_button("$text:Spawn Nebulae")
+
+        on gui_message(spawn_nebula_button):
+            gm = sbs.get_ship_of_client(client_id)
+            pos = gamemaster_get_pos(gm)
+            size = int(gamemaster_get_size(gm))
+            neb_color = nebula_color_dd.value
+            lbl = nebula_shape_list.listbox.value
+            neb_name = nebula_name_input.value
+            if not nebula_use_default_density.value:
+                data={"density_scale":nebula_density.value,"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size, "cluster_color":neb_color, "marker": neb_use_marker.value, "name": neb_name}
+            else:
+                data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size, "cluster_color":neb_color, "marker": neb_use_marker.value, "name": neb_name}
+            prefab_spawn(lbl, data=data)
 
     yield success
+
 
 === gm_menu_terrain_planets
 metadata: ``` yaml
@@ -297,14 +374,57 @@ icon_index: 13
 icon_color: "#5c3b18"
 priority: 100 # Smaller number is higher priority
 ```
-    # sec = gui_sub_section()
-    # with sec:
-    debug_print("Spawn button")
-    gui_button("Spawn Asteroids")
-    gui_row()
-    gui_blank()
+    with gui_sub_section():
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Planet Spawn Settings")
+
+        gui_row("row-height: 0.5em; background-color: #122048;")
+        gui_blank()
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text: Planet Radius:")
+        gui_row("row-height: 1.5em;")
+        planet_radius_slider = gui_slider("low:200;high:10000;text:int;")
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Select Planet Type:;","col-width: content;")
+
+        planet_prefabs = labels_get_type("prefab/terrain/planet")
+
+        gui_row()
+        planet_type_list = gui_list(planet_prefabs, select=True)
+        with planet_type_list as prefab:
+            display_text = prefab.get_inventory_value("display_text")
+            if display_text is None:
+                display_text = prefab.get_inventory_value("type").replace("prefab/terrain/","").replace("asteroid/","").replace("nebula/","")
+            gui_text(f"$text:{display_text}")
+        planet_type_list.set_selected_index(0)
+
+        gui_row("row-height: 1.5em;")
+        planet_use_marker = gui_checkbox("$text:Show Planet Name;")
+
+        gui_row("row-height: 1.5em;")
+        planet_name_input = gui_input("$text:;desc:Planet Name;")
+        
+        gui_row("row-height: 1.5em;")
+        spawn_planet_button = gui_button("$text:Spawn Planet")
+
+        on gui_message(spawn_planet_button):
+            gm = sbs.get_ship_of_client(client_id)
+            pos = gamemaster_get_pos(gm)
+            size = int(gamemaster_get_size(gm))
+            radius = planet_radius_slider.value
+            # TODO: Add color options for planets
+            lbl = planet_type_list.listbox.value
+            if planet_use_marker.value:
+                planet_name = planet_name_input.value
+            else:
+                planet_name = ""
+            data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"planet_radius":radius, "name": planet_name}
+            prefab_spawn(lbl, data=data)
     yield success
-#endregion
+
 
 === gm_menu_terrain_other
 metadata: ```
@@ -362,7 +482,7 @@ priority: 200
 
     yield success
 
-
+#endregion
 
 # Temp place for this system
 === gm_menu_communications
@@ -391,15 +511,15 @@ priority: 40 # Smaller number is higher priority
         # print(from_options)
         with from_list_box as id:
             obj = to_object(id)
-            # gui_row("row-height: 1em;")
-            if has_role(obj, "station"):
-                gui_icon("icon_index: 114;color: #555555")
-            elif has_role(obj, "lifeform"):
-                gui_icon("icon_index: 83; color: green;")
-            else:
-                gui_icon("icon_index: 140; color: blue;")
-            gui_text(f"{obj.name}")
-            # gui_text(f"$text:")
+            if obj is not None:
+                # gui_row("row-height: 1em;")
+                if has_role(obj, "station"):
+                    gui_icon("icon_index: 114;color: #555555")
+                elif has_role(obj, "lifeform"):
+                    gui_icon("icon_index: 83; color: green;")
+                else:
+                    gui_icon("icon_index: 140; color: blue;")
+                gui_text(f"{obj.name}")
         
         on change from_search_bar.value:
             from_options = to_object_list(any_role("lifeform,__npc__,station,fighter"))

@@ -81,7 +81,14 @@ def gamemaster_move_nav_area(ORIGIN_ID, pos, size_delta=0, selection_type="lmb")
 
     nav.visibleToShip = ORIGIN_ID
     set_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SELECT_ID", nav_id)
-    
+
+def gamemaster_get_size(ORIGIN_ID, selection_type="lmb"):
+    """
+    Get the gamemaster's nav area size.
+    """
+    #TODO: Change this to use 3D.
+    size = get_inventory_value(ORIGIN_ID, f"GAMEMASTER_{selection_type}_SIZE", 5000)
+    return size
 
 def gamemaster_get_pos(ORIGIN_ID, selection_type="lmb"):
     """
