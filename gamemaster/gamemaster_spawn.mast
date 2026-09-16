@@ -391,10 +391,7 @@ priority: 300 # Smaller number is higher priority
         gui_row("row-height: 1.5em;")
         color_list = ["purple","red","blue","yellow","green","orange","white","custom"]
         nebula_color_dd = gui_drop_down(f"$text:purple;list:{','.join(color_list)};")
-        
-        gui_row("row-height: 1.5em;")
-        on gui_message(gui_button("Test DD")):
-            nebula_color_dd.value = "#123456"
+
 
         gui_row("row-height: 1.5em;")
         gui_text("$text:Shape:;","col-width: content;")
@@ -549,6 +546,111 @@ priority: 500
 
     yield success
 
+#endregion
+
+=== gm_menu_test
+metadata: ```
+type: gm_menu/station/test
+icon_index: 1
+icon_color: " #000000"
+priority: 600
+settings:
+- function: gui_input
+  text: Default Text
+  desc: Name
+  var_name: name
+- function: gui_slider
+  low: 0
+  high: 20
+  text: int
+  var_name: test
+```
+    data={"label_type":"gm_menu/terrain/planet","type_name":"Planet","settings":settings}
+    await gui_sub_task_schedule(gm_menu_reusable_spawn_logic, data=data)
+
+    yield success
+
+#region Reusable Spawn Logic
+
+=== gm_menu_reusable_spawn_logic
+" Use this to set up spawn menus in an extensible manner.
+metadata: ```
+label_type: prefab/terrain/asteroid # you'll want to change this of course
+type_name: Asteroid
+```
+    with gui_sub_section():
+        default settings = list()
+        default label_type = "prefab/terrain/asteroid"
+        default type_name = "Asteroid"
+
+        gui_row("row-height: 1.5em;")
+        gui_text(f"{type_name} Spawn Settings")
+
+        # Just a spacer
+        gui_row("row-height: 0.5em; background-color: #122048;")
+        gui_blank()
+
+        var_dict = dict()
+
+        for setting in settings:
+            gui_row("row-height: 1.5em;")
+            # gui_text(f"$text:{setting.get('function')}")
+            function_name = setting.get("function")
+            function_exec = gm_get_mast_global_function(function_name)
+            attributes = setting.keys()
+
+            props = ""
+            for a in attributes:
+                if a == "function":
+                    continue
+                if a == "var_name":
+                    continue
+                attribute = setting.get(a)
+                # if a == "text":
+                #     a = "$text"
+                props += f"{a}:{attribute};"
+            print(props)
+            if function_exec is not None:
+                function_exec(props)
+            
+            # setting_func = settings.get(setting)
+            # debug_print(setting_func)
+
+
+
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Shape:;","col-width: content;")
+
+        generic_prefabs = labels_get_type(label_type)
+
+        gui_row()
+        prefab_list = gui_list(generic_prefabs, select=True)
+        with prefab_list as prefab:
+            display_text = prefab.get_inventory_value("display_text")
+            if display_text is None:
+                display_text = prefab.get_inventory_value("type").replace(f"{label_type}/","")
+            gui_text(f"$text:{display_text}")
+        prefab_list.set_selected_index(0)
+
+        # # gui_row("row-height: 1.5em;")
+        # # neb_use_marker = gui_checkbox("$text:Use Marker;")
+        # gui_row("row-height: 1.5em;")
+        obj_name_input = gui_input("$text:;desc:{type_name} Name;")
+        
+        gui_row("row-height: 1.5em;")
+        spawn_obj_button = gui_button("$text:Spawn {type_name}")
+
+        on gui_message(spawn_obj_button):
+            gm = sbs.get_ship_of_client(client_id)
+            pos = gamemaster_get_pos(gm)
+            size = int(gamemaster_get_size(gm))
+            neb_color = nebula_color_dd.value
+            lbl = prefab_list.listbox.value
+            obj_name = obj_name_input.value
+            data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size, "cluster_color":neb_color, "name": obj_name}
+            prefab_spawn(lbl, data=data)
+
+    yield success
 #endregion
 
 # Temp place for this system

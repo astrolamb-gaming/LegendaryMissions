@@ -1,4 +1,4 @@
-from sbs_utils.mast.mast_globals import debug_print
+from sbs_utils.mast.mast_globals import debug_print, MastGlobals
 from sbs_utils.procedural.style import apply_control_styles
 from sbs_utils.agent import Agent
 from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
@@ -230,6 +230,8 @@ def gm_get_menu_items_tree(parent_menu=None):
     items = {}
     for label in labels:
         path = label.get_inventory_value("type")
+        if path is None:
+            continue
         if parent_menu is not None:
             items[path] = label
             continue
@@ -237,6 +239,16 @@ def gm_get_menu_items_tree(parent_menu=None):
         if len(tree) == 2:
             items[path] = label
     return items
+
+def gm_get_mast_global_function(func_name):
+    """
+    Get the function of the given name, if it exists.
+    Args:
+        func_name (str): The function name
+    Returns:
+        Callable | None: The function or None
+    """
+    return MastGlobals.globals.get(func_name)
 
 def gm_show_menu_contents(cid, left, top, width, height, widget):
     """
