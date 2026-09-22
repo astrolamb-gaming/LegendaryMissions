@@ -1,0 +1,177 @@
+# WING ORDERS - a station (or carrier) launches its AI fighters on a bridge's say-so.
+#
+# These are ordinary order labels (see comms/order_labels.mast). The fighters then fly the
+# SAME orders a bridge gives any ship - objective_attack_target (prefabs/defender.mast) and
+# objective_escort (comms/order_labels.mast) - so a launched fighter can also be ordered
+# individually afterwards, like any ally.
+#
+# ONE ENTRY PER WING. A host can have several wings (Red, Gold...). Each label names
+# `instances: hangar_wing_instances`, so the menu shows it once per wing it applies to
+# right now, and the chosen wing reaches the objective as `order_instance`:
+#
+#   wing_state: ready   a wing with craft ready and none out   Launch Red wing ...
+#   wing_state: out     a wing with fighters out                Reassign / Recall Red wing
+#
+# BINGO. Each fighter launches with HANGAR_WING_ENDURANCE seconds of fuel; the timer's
+# signal (//shared/signal/hangar_wing_bingo below) sends it home to refit, and a Reassign
+# leaves it alone.
+#
+# `ack:` is what the unit answers on comms, since "Heading to <target>" (the carry-out
+# default) is wrong for a station that is not going anywhere.
+
+
+=== objective_wing_launch
+metadata: ```
+display_name: Launch @
+type: objective/orders/launch/attack
+objective_target: null
+objective_target_point: null
+order_instance: null
+valid_for: hostile
+requires: launch
+instances: hangar_wing_instances
+wing_state: ready
+ack: Launching fighters against
+```
+    " Send the ready fighters after a target
++++ enter
+    # A bridge's order takes the station back from its own AI.
+    hangar_wing_delegate(OBJECTIVE_AGENT_ID, False)
+    for wing_id in hangar_wing_launch(OBJECTIVE_AGENT_ID, None, order_instance):
+        objective_add(wing_id, objective_attack_target, {"objective_target": objective_target, "objective_target_point": None})
+
++++ test
+    yield success
+
+
+=== objective_wing_protect
+metadata: ```
+display_name: Launch @ to protect
+type: objective/orders/launch/protect
+objective_target: null
+objective_target_point: null
+order_instance: null
+valid_for: allies, marker
+requires: launch
+instances: hangar_wing_instances
+wing_state: ready
+ack: Launching fighters to cover
+```
+    " Send the ready fighters to escort a friendly ship
++++ enter
+    # A bridge's order takes the station back from its own AI.
+    hangar_wing_delegate(OBJECTIVE_AGENT_ID, False)
+    for wing_id in hangar_wing_launch(OBJECTIVE_AGENT_ID, None, order_instance):
+        objective_add(wing_id, objective_escort, {"objective_target": objective_target, "objective_target_point": None})
+
++++ test
+    yield success
+
+
+=== objective_wing_reassign
+metadata: ```
+display_name: Reassign @
+type: objective/orders/launch/reassign_attack
+objective_target: null
+objective_target_point: null
+order_instance: null
+valid_for: hostile
+requires: wing_out
+instances: hangar_wing_instances
+wing_state: out
+ack: Wing, new target
+```
+    " Turn the fighters still out - and any ready in the bay - onto a new target
++++ enter
+    # A bridge's order takes the station back from its own AI.
+    hangar_wing_delegate(OBJECTIVE_AGENT_ID, False)
+    for wing_id in hangar_wing_reassign(OBJECTIVE_AGENT_ID, order_instance):
+        objective_clear(wing_id)
+        objective_add(wing_id, objective_attack_target, {"objective_target": objective_target, "objective_target_point": None})
+
++++ test
+    yield success
+
+
+=== objective_wing_reassign_protect
+metadata: ```
+display_name: Reassign @ to protect
+type: objective/orders/launch/reassign_protect
+objective_target: null
+objective_target_point: null
+order_instance: null
+valid_for: allies, marker
+requires: wing_out
+instances: hangar_wing_instances
+wing_state: out
+ack: Wing, cover
+```
+    " Send the fighters still out - and any ready in the bay - to escort a friendly ship
++++ enter
+    # A bridge's order takes the station back from its own AI.
+    hangar_wing_delegate(OBJECTIVE_AGENT_ID, False)
+    for wing_id in hangar_wing_reassign(OBJECTIVE_AGENT_ID, order_instance):
+        objective_clear(wing_id)
+        objective_add(wing_id, objective_escort, {"objective_target": objective_target, "objective_target_point": None})
+
++++ test
+    yield success
+
+
+=== objective_wing_recall
+metadata: ```
+display_name: Recall @
+type: objective/orders/launch/recall
+order_instance: null
+valid_for: self
+requires: wing_out
+instances: hangar_wing_instances
+wing_state: out
+ack: Recalling fighters
+```
+    " Bring every fighter home to land and refit
++++ enter
+    # A bridge's order takes the station back from its own AI.
+    hangar_wing_delegate(OBJECTIVE_AGENT_ID, False)
+    for wing_id in hangar_wing_out(OBJECTIVE_AGENT_ID, order_instance):
+        objective_clear(wing_id)
+        objective_add(wing_id, hangar_wing_return)
+
++++ test
+    yield success
+
+
+# NOT an order - no `objective/orders/` type, so it never shows on a menu. What a recalled
+# or bingo fighter flies: straight home, and it lands (leaves the map, into refit) on
+# arrival.
+=== hangar_wing_return
+metadata: ```
+type: objective/hangar_wing/return
+```
++++ enter
+    wing_home = hangar_wing_home(OBJECTIVE_AGENT_ID)
+    brain_clear(OBJECTIVE_AGENT_ID)
+    set_inventory_value(OBJECTIVE_AGENT_ID, "blackboard:target", None)
+    set_inventory_value(OBJECTIVE_AGENT_ID, "blackboard:target_point", None)
+    orders_stance_set(OBJECTIVE_AGENT_ID, "hold")
+    if wing_home is not None:
+        brain_add(OBJECTIVE_AGENT_ID, goto_object_or_location, {"force_target": wing_home, "clear_when_reached": False, "stop_dist": 400})
+    brain_add(OBJECTIVE_AGENT_ID, ai_full_stop)
+
++++ test
+    if hangar_wing_is_bingo(OBJECTIVE_AGENT_ID):
+        OBJECTIVE.set_inventory_value("desc", "Bingo fuel, returning to land")
+    else:
+        OBJECTIVE.set_inventory_value("desc", "Returning to land")
+    yield success if hangar_wing_land(OBJECTIVE_AGENT_ID)
+    yield idle
+
+
+# BINGO FUEL - the fighter's endurance timer ran out. SHARED: it changes the fighter's
+# orders, which must happen once, on the server, not once per console.
+//shared/signal/hangar_wing_bingo
+    ->END if not object_exists(TIMER_AGENT_ID)
+    ->END if not has_role(TIMER_AGENT_ID, "hangar_wing")
+    hangar_wing_bingo_mark(TIMER_AGENT_ID)
+    objective_clear(TIMER_AGENT_ID)
+    objective_add(TIMER_AGENT_ID, hangar_wing_return)

@@ -3,3 +3,7 @@
 # quest board and assignment can read them. See hangar_quests.amd.
 #
 shared HANGAR_QUEST_DOC = document_get_amd_file(None, "Hangar", content=media_read_relative_file("hangar_quests.amd"))
+
+# Sorties are ordinary quests: the flight deck grants a craft's orders to the pilot when
+# the craft is picked (hangar_offer_sorties), and they are accepted under Available
+# Quests like any other.

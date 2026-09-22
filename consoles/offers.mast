@@ -1,0 +1,72 @@
+
+# Available Quests (app key "offers") - the quests you could take on, on the same screen as Quests.
+#
+# The Quests tab answers "what have we taken on?". This answers "what could we?" - every
+# untaken quest (a mission's patrol quests, the sorties for the craft a pilot picked),
+# plus Open Universe station work, which is priced when you hail and only becomes a quest
+# then. Players see one word for all of it: quest.
+#
+# NOTHING HERE INTERRUPTS. The tile appears when there is something and is absent when
+# there is not; it never raises a panel, never speaks, and never takes the screen.
+#
+# TOP-LEVEL CODE FIRST, ROUTES LAST. A `//` route ends at the next non-inline label or
+# the end of the file, so a top-level statement written BELOW one is a compile error -
+# and a story that does not compile schedules no task at all (0 labels, nothing spawned).
+
+default shared OFFERS_TAB_ENABLED = True
+
+# A hail is transient - the strip entry goes on close and the only trace left is a
+# history tab nobody opens. File one durable line in the ship's log saying the
+# conversation happened, so a crew can find their way back to what they were told, and
+# so a call nobody picked up leaves something behind at all.
+#
+# It does NOT interrupt: log_notify raises only for a severity in RAISE_ON, which is
+# empty. The library default is OFF (a shipped mission must not change behavior under
+# it); LegendaryMissions opts in here.
+default shared HAIL_ECHO_ENABLED = True
+default shared HAIL_ECHO_DECLINED = True
+hail_echo_enable(HAIL_ECHO_ENABLED, declined=HAIL_ECHO_DECLINED)
+
+# Say on the COMMS PANEL that a contact has work, so the crew can tell before they hail.
+# Cheapest possible surface: a few characters on a title they are already reading, in
+# the moment they are deciding whether to press Hail. Off unless a mission wants it,
+# because it is the one thing here that changes an existing screen.
+default shared OFFER_COMMS_HINT = True
+if OFFER_COMMS_HINT:
+    comms_selection_annotator(lm_comms_offer_title)
+
+
+# One quiet line when the work on offer CHANGES - filed in the log and shown in the
+# ambient strip, on the consoles that can accept a job. Only on change, so a quiet system
+# says nothing forever; and it yields to anything currently speaking.
+default shared OFFER_DIGEST_ENABLED = True
+default shared OFFER_DIGEST_SECONDS = 240
+default shared OFFER_DIGEST_CONSOLES = ""
+
+if OFFER_DIGEST_ENABLED:
+    task_schedule(offer_digest_pump)
+
+
+# The route's own condition hides the tile entirely when there is nothing on offer - the
+# same thing the Survey app does. A board that is always present but usually empty is one
+# more button to learn; a board that appears exactly when it has something is an answer.
+# offer_board_count_here counts what this screen actually lists (untaken jobs, sorties,
+# station work), so the tile never opens onto an empty list.
+//gui/app/offers if OFFERS_TAB_ENABLED and offer_board_count_here() > 0
+    # THE QUEST SCREEN, listing what could be taken. Not a screen of its own: the list,
+    # the description pane and the gated Accept button are the Quests tab's, so the two
+    # read alike and a fix to one is a fix to both (documents/quest_tab.mast).
+    quest_tab_mode = "offers"
+    quest_sel_index = -1
+    quest_sel_hint = None
+    jump quest_tab_screen
+
+
+# A slow pump, jittered. An exact metronome reads as a machine even in a log line, and
+# the jitter costs nothing. A NEW top-level label goes at the END of the file, after the
+# routes, because labels fall through - the adjacency of two labels is an interface.
+== offer_digest_pump
+--- beat
+    await delay_sim(random.uniform(OFFER_DIGEST_SECONDS, OFFER_DIGEST_SECONDS * 1.5))
+    lm_offer_digest_tick()
+    jump beat

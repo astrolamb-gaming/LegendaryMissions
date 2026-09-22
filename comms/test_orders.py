@@ -28,9 +28,32 @@ from sbs_utils.procedural.spawn import npc_spawn, player_spawn
 from sbs_utils.spaceobject import SpaceObject
 
 
+class _Order:
+    """Stands in for an order label: labels_get_type needs a live story page."""
+    def __init__(self, name, **meta):
+        self.name = name
+        self.meta = dict(meta, type="objective/orders/defender")
+
+    def get_inventory_value(self, key, default=None):
+        return self.meta.get(key, default)
+
+
+_LABELS = [_Order("goto", requires="move", valid_for="any"),
+           _Order("attack", requires="move, weapons", valid_for="hostile"),
+           _Order("stop", requires="move", valid_for="self")]
+
+
 class OrdersBase(unittest.TestCase):
     def setUp(self):
+        import sbs_utils.procedural.orders as LO
+        self._real_labels = LO._orders_labels
+        LO._orders_labels = lambda prefix, labels=None: list(_LABELS)
         mock.create_new_sim()
+        # A delete is deferred to the end of the handler, which a test never reaches - so
+        # a deleted id stays "pending" and, once the fresh sim hands the same id out again,
+        # object_exists says the NEW object is gone.
+        from sbs_utils.delete_queue import DeleteQueue
+        DeleteQueue.clear()
         Agent.clear()
         clear_shared()
         SpaceObject.clear()
@@ -42,11 +65,13 @@ class OrdersBase(unittest.TestCase):
         self.hero = to_object(player_spawn(0, 0, 0, "Hero", "tsn", "behav_playership"))
 
     def tearDown(self):
+        import sbs_utils.procedural.orders as LO
+        LO._orders_labels = self._real_labels
         FrameContext.context = None
 
     def npc(self, side, name="Ship", roles=""):
         r = side + ("," + roles if roles else "")
-        return to_object(npc_spawn(1000, 0, 0, name, r, "tng_fed_nebula",
+        return to_object(npc_spawn(1000, 0, 0, name, r, "tsn_light_cruiser",
                                    "behav_npcship"))
 
 
@@ -73,6 +98,12 @@ class TestTheGate(OrdersBase):
         O.lm_orders_block(ally)
         self.assertFalse(O.lm_can_take_orders(self.hero.id, ally.id))
 
+    def test_A_STOCK_STATION_IS_NOT_ORDERABLE(self):
+        """What put stations in the Can order chip. No engine, and engine-measured no
+        working guns on a stock hull - there is nothing it could be told to do."""
+        base = to_object(npc_spawn(2000, 0, 0, "DS1", "tsn,station", "starbase_command", "behav_station"))
+        self.assertFalse(O.lm_can_take_orders(self.hero.id, base.id))
+
     def test_a_player_ship_is_not_orderable(self):
         """Another bridge is not somebody's escort."""
         other = to_object(player_spawn(5000, 0, 0, "Other", "tsn", "behav_playership"))
@@ -96,14 +127,68 @@ class TestTheOrderList(OrdersBase):
         set_inventory_value(ally.id, "give_orders_type", "objective/orders/special")
         self.assertEqual(O.lm_orders_type(ally.id), "objective/orders/special")
 
-    def test_the_default_is_remembered(self):
-        """So the popup and the carry-out path agree, rather than one of them looking it
-        up again and getting a different answer."""
+    def test_THE_LEGACY_DEFENDER_SET_IS_WIDENED(self):
+        """A ship still carrying the old one-and-only set would be narrowed to its four
+        orders by the library, which reads the value directly - so it is rewritten."""
+        from sbs_utils.procedural.inventory import get_inventory_value, set_inventory_value
         ally = self.npc("tsn")
-        O.lm_orders_type(ally.id)
-        from sbs_utils.procedural.inventory import get_inventory_value
+        set_inventory_value(ally.id, "give_orders_type", "objective/orders/defender")
+        self.assertEqual(O.lm_orders_type(ally.id), O.DEFAULT_ORDERS)
         self.assertEqual(get_inventory_value(ally.id, "give_orders_type", None),
                          O.DEFAULT_ORDERS)
+
+    def test_the_orders_for_a_target(self):
+        ally = self.npc("tsn")
+        foe = self.npc("klingon", "Foe")
+        names = sorted(l.name for l in O.lm_orders_for(self.hero.id, ally.id, foe.id))
+        self.assertEqual(["attack", "goto"], names)
+        names = sorted(l.name for l in O.lm_orders_for(self.hero.id, ally.id, 0))
+        self.assertEqual(["stop"], names)
+
+
+class TestDragOrderRecord(OrdersBase):
+    """Drag to order: the target has to survive from the drag to the menu, and must never
+    come back once it is stale."""
+
+    def setUp(self):
+        super().setUp()
+        self.unit = self.npc("tsn", "Unit")
+        self.foe = self.npc("klingon", "Foe")
+
+    def test_the_target_is_remembered_for_that_unit(self):
+        O.lm_drag_orders_set(self.hero.id, self.unit.id, self.foe.id)
+        self.assertEqual(self.foe.id, O.lm_drag_orders_target(self.hero.id, self.unit.id))
+
+    def test_not_for_a_different_unit(self):
+        """A record is for ONE unit - comms on another ally must not inherit it."""
+        other = self.npc("tsn", "Other")
+        O.lm_drag_orders_set(self.hero.id, self.unit.id, self.foe.id)
+        self.assertEqual(0, O.lm_drag_orders_target(self.hero.id, other.id))
+
+    def test_A_DELETED_TARGET_IS_NO_TARGET(self):
+        from sbs_utils.procedural.space_objects import delete_object
+        O.lm_drag_orders_set(self.hero.id, self.unit.id, self.foe.id)
+        delete_object(self.foe.id)
+        self.assertEqual(0, O.lm_drag_orders_target(self.hero.id, self.unit.id))
+
+    def test_a_deleted_unit_is_no_target(self):
+        from sbs_utils.procedural.space_objects import delete_object
+        O.lm_drag_orders_set(self.hero.id, self.unit.id, self.foe.id)
+        delete_object(self.unit.id)
+        self.assertEqual(0, O.lm_drag_orders_target(self.hero.id, self.unit.id))
+
+    def test_clear_forgets_it(self):
+        O.lm_drag_orders_set(self.hero.id, self.unit.id, self.foe.id)
+        O.lm_drag_orders_clear(self.hero.id)
+        self.assertEqual(0, O.lm_drag_orders_target(self.hero.id, self.unit.id))
+
+    def test_two_bridges_do_not_overwrite_each_other(self):
+        other_bridge = to_object(player_spawn(5000, 0, 0, "Other", "tsn", "behav_playership"))
+        foe2 = self.npc("klingon", "Foe2")
+        O.lm_drag_orders_set(self.hero.id, self.unit.id, self.foe.id)
+        O.lm_drag_orders_set(other_bridge.id, self.unit.id, foe2.id)
+        self.assertEqual(self.foe.id, O.lm_drag_orders_target(self.hero.id, self.unit.id))
+        self.assertEqual(foe2.id, O.lm_drag_orders_target(other_bridge.id, self.unit.id))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from sbs_utils.procedural.items import item_get
 from sbs_utils.procedural.upgrades import upgrade_add
 
 from sbs_utils.procedural.timers import is_timer_set, set_timer, is_timer_finished
-from sbs_utils.procedural.execution import set_shared_variable, get_shared_variable, get_variable
+from sbs_utils.procedural.execution import set_shared_variable, get_shared_variable, get_variable, log
 from sbs_utils.agent import Agent
 from sbs_utils.procedural.query import get_science_selection
 from sbs_utils.procedural.inventory import get_inventory_value, set_inventory_value
@@ -207,12 +207,20 @@ def hangar_craft_spawn(docked_id, craft_data):
         roles (str): a comma-separated list of roles
         prefix (str): the desired prefix to the name of craft
     Returns:
-        SpawnData: The SpawnData object associated with the craft
+        SpawnData: The SpawnData object associated with the craft, or None when
+            `docked_id` is not a live ship or station (logged as a warning).
     """
     global _craft_id
-    
+
     docked_id = to_id(docked_id)
     so = to_space_object(docked_id)
+    if so is None:
+        # Say so rather than raise: an AttributeError here was reported against the
+        # CALLER's line, which reads as correct. A None usually means the call ran
+        # before the ship was spawned - an ordering problem in the caller.
+        log(f"hangar_craft_spawn: {docked_id!r} is not a live ship or station - "
+            f"no {craft_data.get('type', 'craft')} spawned", "hangar", "warning")
+        return None
 
     sd_key = craft_data.get("key", "tsn_fighter")
     sd = get_ship_data_for(sd_key)
@@ -305,7 +313,8 @@ def hangar_random_craft_spawn(docked_id, craft_type=None):
         craft_type (str | None): Which type of craft to spawn. Valid values are "shuttle",
             "fighter", "bomber", and None. See main function description for details.
     Returns:
-        SpawnData: The SpawnData object associated with the craft that was spawned.
+        SpawnData: The SpawnData object associated with the craft that was spawned,
+            or None when nothing could be (logged as a warning).
     """
     if craft_type is None:
         craft_type_d10_roll = randint(1, 10)
@@ -321,6 +330,12 @@ def hangar_random_craft_spawn(docked_id, craft_type=None):
     
     craft_data_list = hangar_get_ship_data_keys(docked_id)
     filtered = [craft_data for craft_data in craft_data_list if craft_type == craft_data.get("type")]
+    if not filtered:
+        # random.choice([]) raised IndexError - for a ship whose hull carries no
+        # craft of this type, and for any id that is not a ship at all.
+        log(f"hangar_random_craft_spawn: {to_id(docked_id)!r} carries no {craft_type} - "
+            f"nothing spawned", "hangar", "warning")
+        return None
     craft_data_to_spawn = random.choice(filtered)
 
     return hangar_craft_spawn(docked_id, craft_data_to_spawn)
@@ -853,3 +868,47 @@ def hangar_hint(hints, name):
     if not hints:
         return None
     return hints.get(name)
+
+
+# --- The Flight Wing --------------------------------------------------------------
+#
+# ONE quest holder per side that every flight-deck and cockpit console of that side
+# shares. A pilot's console is assigned to the CARRIER while on the deck, so the quest
+# screens listed the carrier's patrol quests as "Ship"; the hangar names the wing
+# instead (quest_holder_set), and the screens list it as "Flight Wing". A mission can
+# grant wing-wide quests to it (`hangar_flight_wing(side)`); a pilot's own sorties stay
+# on the pilot.
+
+HANGAR_FLIGHT_WING_KEY = "flight_wing_id"
+
+
+def hangar_flight_wing(side):
+    """The Flight Wing agent for `side` (a side key, side id or space object), created on
+    first use. Kept on the side agent, so it goes with the mission. None without a side."""
+    from sbs_utils.procedural.sides import to_side_id
+    from sbs_utils.agent import get_story_id
+    side_id = to_side_id(side)
+    if side_id is None:
+        return None
+    wing_id = get_inventory_value(side_id, HANGAR_FLIGHT_WING_KEY, None)
+    if wing_id is not None and Agent.get(wing_id) is not None:
+        return wing_id
+    wing = Agent()
+    wing.id = get_story_id()
+    wing.add()
+    wing.add_role("__flight_wing__")
+    wing.set_inventory_value("side_key", get_inventory_value(side_id, "side_key", None))
+    set_inventory_value(side_id, HANGAR_FLIGHT_WING_KEY, wing.id)
+    return wing.id
+
+
+def hangar_use_flight_wing(client_id, side):
+    """Make this console's quest screens list `side`'s Flight Wing in place of the ship
+    it is assigned to (the carrier, on the flight deck)."""
+    from sbs_utils.procedural.quest_driver import quest_holder_set, quest_holder_clear
+    wing = hangar_flight_wing(side)
+    if wing is None:
+        quest_holder_clear(client_id)
+        return None
+    quest_holder_set(client_id, wing, "Flight Wing")
+    return wing

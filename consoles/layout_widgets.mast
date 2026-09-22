@@ -1,11 +1,6 @@
-shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
 
 #=== layout_comms_engine_widgets
 //gui/normal_comm
-
-    jump mike_comms if COMMS_PROTOTYPE
-
-    
     # Left
     gui_section(style="area:0,45px,100,100;")
     
@@ -52,8 +47,33 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         #     gui_info_panel_add("objective", 85, gui_panel_console_message,None)
         #     gui_info_panel_add("objectives", 86, gui_panel_console_message_list,None)
 
-        gui_row()
-        gui_blank()
+# Follow and RED ALERT ride here, under the contact list, rather than in the
+        # left column: that column already carries a 400px info panel and a log tail,
+        # and the incoming-hail answer strip needs the room. One row, one height, so
+        # they read as a single control bar.
+        gui_row("row-height: 40px;")
+        follow_tag = get_inventory_value(client_id, "2d_follow", True)
+        # Set back in case of default
+        set_inventory_value(client_id, "2d_follow", follow_tag)
+        gui_layout_widget("red_alert")
+        gui_checkbox("Follow", var="follow_tag")
+        
+        on change follow_tag:
+            ship = viewscreen_home_ship(client_id)
+            _sel = get_comms_selection(ship)
+            set_inventory_value(client_id, "2d_follow", follow_tag)
+            comms_set_2dview_focus(client_id, _sel)
+
+
+
+## Options/Face
+        gui_row("row-height:100px;")
+        gui_layout_widget("comms_face")
+        # Options only exists while a comms route fills it (ship to ship, today) -
+        # every comms navigation clears it. Empty, its row folds away and the hail
+        # list below gets the room.
+        gui_row("row-height:5em;")
+        gui_property_list_box("Options", hide_when_empty=True)
 
         # NOT sbs.get_ship_of_client: while an orbit hail runs, this console is
         # ASSIGNED to the hailer, so the engine would answer with the raider.
@@ -71,7 +91,7 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         # "Incoming Hails" - the waiting hails, or the open conversation's replies. One
         # call, and the library owns which of its three states applies. A listbox, so a
         # queue longer than the space still scrolls rather than being dropped.
-        hail_choice_strip(_hail_ship, client_id)
+        hail_choice_strip(_hail_ship, client_id, row_style="row-height:1fr;")
 
 
     _comms_text_height = "30"
@@ -83,8 +103,30 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         # spanning the same width, which is what the cockpit does (hangar.mast). It used
         # to sit in an absolute box of its own with no relationship to the view at all.
         # 45px because the control is small and fixed - it does not want stretching.
-        gui_row("row-height:45px;")
-        gui_layout_widget("radar_zoom_ctrl")
+#        gui_row("row-height:45px;")
+#        gui_layout_widget("radar_zoom_ctrl")
+        # The filter chips take that band (comms_chips.py): a horizontal listbox, so
+        # when the chips outrun the view it draws a slider under them and scrolls.
+        # `col-width` is each chip's width, sized for a label like "Stations 12".
+        # The background must stay SEE-THROUGH: it is drawn on the same layer as the
+        # selection highlight, and an opaque one hides which chips are selected.
+        gui_row("row-height:56px;")
+        # The star: toggles the comms selection as a FAVORITE (kept on the ship, shared by
+        # the crew), shown by the Favorites chip. Gold filled = a favorite, outline = not.
+        comms_star = lm_comms_chips_star_button(client_id, "col-width:48px;padding:6px,10px,6px,10px;")
+        comms_chips = gui_list_box(lm_comms_chips_items(client_id), "col-width:6em;background:#0E151D80;", item_template=lm_comms_chips_template, section_style="padding:3px,4px,3px,4px;", select=True, multi=True)
+        comms_chips.horizontal = True
+        comms_chips.selected = lm_comms_chips_selected(client_id)
+        on change comms_chips.get_selected():
+            lm_comms_chips_normalize(client_id, comms_chips)
+        on change lm_comms_chips_revision(client_id):
+            lm_comms_chips_refresh(client_id, comms_chips)
+        on gui_message(comms_star):
+            lm_comms_chips_toggle_favorite(client_id)
+            lm_comms_chips_star_show(client_id, comms_star)
+            lm_comms_chips_refresh(client_id, comms_chips)
+        on change lm_comms_chips_star_revision(client_id):
+            lm_comms_chips_star_show(client_id, comms_star)
         gui_row()
         # A hail placed on THIS console takes the radar's space. gui_widget_offscreen
         # is the only reliable way to be rid of an engine widget - gui_hide does not
@@ -94,64 +136,13 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
             hail_view(_hail_ship, client_id)
         else:
             gui_layout_widget("comms_2d_view")
-        
-    # Right
-    ss = gui_screen_size(client_id)
 
-    default select_2d = False
-    _widget = "comms_2d_view"
-    #if select_2d:
-    #    _widget = "comms_2d_view"
-    with gui_sub_section("col-width:25;"):
-
-        # Put this next to the waterfall, same height
-        gui_row(f"row-height:{_comms_text_height};")
-        gui_layout_widget("comms_control")
-        gui_row("row-height:100px;")
-        gui_layout_widget("comms_face")
-
-        gui_row("row-height:15;")
-        gui_property_list_box("Options")
+    # The route ENDS here - no `yield idle`. A builder that parks on `yield idle` is
+    # CANCELLED by the next GUI build, and a cancelled task cannot be revived, so its
+    # `on change` handlers could stop. One that ends is revived when a handler fires,
+    # which is how normal_helm / normal_weap / normal_main already work.
 
 
-
-
-        # gui_screen_size returns a 1024x768 PLACEHOLDER (z==99) until the client
-        # reports its size, which read as a small screen and cramped wide displays.
-        # When unknown, assume the LARGER layout - it degrades better.
-        if gui_screen_size_known(client_id) and ss.x < 1600:
-            gui_row("row-height: 35px;col-width:25px;")
-        else:
-            gui_row("row-height: 35px;col-width:45px;")
-
-
-        gui_row("row-height:20px;")
-        gui_blank()
-        gui_row() #"padding:0,25px,10px,0")
-        gui_layout_widget("comms_sorted_list")
-
-        # Follow and RED ALERT ride here, under the contact list, rather than in the
-        # left column: that column already carries a 400px info panel and a log tail,
-        # and the incoming-hail answer strip needs the room. One row, one height, so
-        # they read as a single control bar.
-        gui_row("row-height: 40px;")
-        follow_tag = get_inventory_value(client_id, "2d_follow", True)
-        # Set back in case of default
-        set_inventory_value(client_id, "2d_follow", follow_tag)
-        gui_layout_widget("red_alert")
-        gui_checkbox("Follow", var="follow_tag")
-        
-        on change follow_tag:
-            ship = viewscreen_home_ship(client_id)
-            _sel = get_comms_selection(ship)
-            set_inventory_value(client_id, "2d_follow", follow_tag)
-            comms_set_2dview_focus(client_id, _sel)
-        
-        
-    
-
-
-    yield idle
 
 
 
@@ -266,7 +257,10 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         set_inventory_value(client_id, "2d_follow", follow_tag)
         science_set_2dview_focus(client_id, _sel)
         
-    yield idle
+    # The route ENDS here - no `yield idle`. A builder that parks on `yield idle` is
+    # CANCELLED by the next GUI build, and a cancelled task cannot be revived, so its
+    # `on change` handlers could stop. One that ends is revived when a handler fires,
+    # which is how normal_helm / normal_weap / normal_main already work.
 
 //focus/science if not has_role(SCIENCE_SELECTED_ID, 'admiral')
     ->END if SCIENCE_SELECTED is None
@@ -290,10 +284,26 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
 
 //gui/normal_engi
     default tab = 1
-    # Ship Data, 
-    gui_section(style="area:0,45px,min(55,900px),50-50px;")
+    # ONE expression owns the split between the left half and the right, because two
+    # that only look the same DO drift: the left half ended at min(55,900px) and the
+    # right began at min(55,850px), so from 1600x900 up a 50px-wide strip of
+    # ship_internal_view sat UNDER the heat sliders, the power sliders and the presets.
+    # Measured 50px x 445px at 1920x1080. Absolute sections are the one thing in this
+    # layout that CAN overlap, and overlapping hit targets are how a touch goes to the
+    # wrong widget.
+    eng_split = "min(55,900px)"
+    # Ship Data,
+    gui_section(style=f"area:0,45px,{eng_split},50-8px;")
     with gui_sub_section("col-width:280px;"):
-        gui_row("row-height: 400px-3em;")
+        # FLEX, not `row-height: 400px-3em`. That row is a FIXED 328px and fixed rows
+        # are never scaled (layout.py), while THIS section is only 50%-53px tall - so
+        # the column asked for 424px of a box that is 265px at 1280x720, and the log
+        # tail below it drew ~59px down onto the power sliders. Helm and weapons use
+        # the same 400px row inside a FULL-HEIGHT section, which is why only
+        # Engineering showed it. Measured: ship_data comes back 247x328 at every
+        # resolution from 720p to 1440p - it never scales, so it can only be given a
+        # box, not asked to fit one.
+        gui_row()
         gui_info_panel(tab=tab)
         gui_info_panel_add("message", 83, gui_panel_console_message,None, gui_panel_console_message_tick)
         # The log/replay tab: every card ever filed, re-readable. Cards only take
@@ -321,15 +331,49 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         # gui_section(style="area:285px,90px,800px,390px;")
         gui_layout_widget("eng_heat_controls")
 
-    gui_section(style="area:0,50+50px,min(55,900px),100;")
-    
+    # 50+8px, not 50+50px. The two halves used to leave a 100px x 900px band of
+    # nothing between them - a spacer an order of magnitude bigger than the 8px this
+    # layout uses everywhere else. That 100px now goes to the four widgets that were
+    # shortest, and 100-12px lifts the presets off the screen edge.
+    gui_section(style=f"area:0,50+8px,{eng_split},100-12px;")
+
     gui_layout_widget("eng_power_controls")
-    gui_row("row-height: 35px")
+    # 56px, not 35. Eleven buttons, the control an engineer hits mid-fight, and 35px
+    # is under half the 44px a finger needs - on the bottom edge of the screen, the
+    # least forgiving place to put one.
+    gui_row("row-height: 56px;")
     #gui_section(style="area:285px,45px,45,85px;")
     gui_layout_widget("eng_presets")
     # gui_row("row-height:100-100px;")
 
-    gui_section(style="area:min(55,850px),45px,100,100;")
+    gui_section(style=f"area:{eng_split},45px,100,100;")
+    # The crew rail - the damage-control teams as chips. This is what grid_object_list
+    # showed; 
+    # see eng_crew_chips.py for why it is no longer that widget. Same recipe as the
+    # comms filter bar above: horizontal listbox, `col-width` is the chip pitch, and
+    # the background must stay SEE-THROUGH or it hides the selection bar.
+    #
+    # It spans the WHOLE right half, above both columns, rather than sitting over the
+    # interior view alone. Over the view it had 346px at 1280x720, so four 7em chips
+    # never fit and the rail was permanently scrolled - and a horizontal listbox that
+    # overflows draws a slider along its bottom and takes that height OUT of the item
+    # area (layout_listbox: `bottom -= em2`), so the two-line chips were squeezed into
+    # what was left. Full width it is 576px at 720p and 1020px at 1080p, so four 5.5em
+    # chips fit with room to spare. SIZED SO THE SLIDER IS NOT THE NORMAL CASE rather
+    # than budgeting height for one: a 4.5em chip is 108px, so 5 fit at 720p and 9 at
+    # 1080p, and a hull needs six crew objects before a rail scrolls at all. Paying
+    # 20px of permanent height for a slider almost nobody sees costs grid_control its
+    # touch target - the whole column is only 619px at 720p.
+    gui_row("row-height:56px;")
+    eng_crew = gui_list_box(lm_eng_crew_items(client_id), lm_eng_crew_chip_style(), item_template=lm_eng_crew_template, section_style="padding:3px,4px,3px,4px;", select=True)
+    eng_crew.horizontal = True
+    eng_crew.selected = lm_eng_crew_selected(client_id)
+    on change eng_crew.get_selected():
+        lm_eng_crew_pick(client_id, eng_crew)
+    on change lm_eng_crew_revision(client_id):
+        lm_eng_crew_refresh(client_id, eng_crew)
+
+    gui_row()
     with gui_sub_section():
         gui_layout_widget("ship_internal_view")
     # Right
@@ -349,27 +393,64 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         # grid_face in the widget list, and an engine widget that is declared but never
         # given a rect draws at its own default position. So drop it from the list this
         # build declares, and park the one a console was already showing off screen.
-        gui_update_widgets("", "grid_face")
+        # grid_object_list joins it. It listed four rows - DC1, DC2, DC3 and the EPad - in a
+        # 200px box that measured roughly 60% empty, in the one column on this console
+        # that had no room to spare. The crew rail over the interior view is the same
+        # four objects and carries what each one is DOING, which the engine list could
+        # not. Its 200px, and the 2em spacer under it, go to grid_control.
+        #
+        # Same two steps either widget needs: gui_layout_widget alone is not enough,
+        # because gui_console("engineering") declares both in the widget list and a
+        # declared widget nothing places draws at its own default position.
+        gui_update_widgets("", "grid_face^grid_object_list^grid_control")
         gui_widget_offscreen("grid_face")
+        gui_widget_offscreen("grid_object_list")
+        gui_widget_offscreen("grid_control")
         # A backing for the panel. The hull plating behind this column is a tiled
         # light-on-dark pattern, and text drawn straight onto it competes with the
         # tile edges wherever a line happens to cross one - which is most lines. A
         # near-opaque dark ground gives every tab one predictable surface to sit on
         # instead of a different one per row.
         gui_row("background:#011C;")
-        # Selected / Orders / Systems. Tabs, so each gets the WHOLE of a row that is
-        # 587px tall at 1920 and 227 at 1280x720. Built with gui_tabbed_panel, never
-        # gui_info_panel: pending_info_panel is a singleton and the left column owns it.
+        # Selected / Orders / Systems. Tabs, so each gets the WHOLE of the row -
+        # measured 517px at 1920x1080 and 337 at 1280x720, sharing the column evenly
+        # with grid_control below. Built with gui_tabbed_panel, never gui_info_panel:
+        # pending_info_panel is a singleton and the left column owns it.
         eng_grid_panel()
-        gui_row("row-height:200px;")
-        gui_layout_widget("grid_control")
-        gui_row("row-height:2em;")
-        gui_blank(1)
-        gui_row("row-height:200px;")
-        gui_layout_widget("grid_object_list")
+        # The orders for the selection - the SAME //comms/grid buttons grid_control
+        # drew, rendered by the console instead (eng_grid_buttons.py). grid_control is
+        # an engine widget we could only hand a rectangle to: no scroll, no row
+        # height, no styling, and a menu taller than the box was cut off. At its old
+        # hard 200px it was 33px a button at EVERY resolution - measured at 720p and
+        # at 1440p.
+        #
+        # A listbox scrolls, so a selection offering nine orders no longer loses the
+        # last four, and the row is a real touch target. Grid comms itself is
+        # untouched: the routes, the expansion and the press path are exactly as they
+        # were, and the engine widget is parked on THIS console only, so any other
+        # console or mission still showing it is unaffected.
+        # FIXED, and last in the column, so the orders sit at the BOTTOM and the
+        # read-out panel above takes everything else. The height is exactly the rows
+        # it shows (eng_grid_buttons.lm_eng_buttons_box_height) and the list scrolls
+        # past them - which is what makes this column plannable at all. The engine
+        # widget could only be handed a rectangle and packed whatever it had into it.
+        gui_row(f"row-height: {lm_eng_buttons_box_height(client_id)};")
+        # Each ROW is its own gui_button carrying the order's index, so the listbox is
+        # only a scrolling container - no selection, and no press wiring here. A
+        # listbox built with select=False ignores clicks outright, and a selection is
+        # the wrong shape for a menu anyway: pressing an order is an action, not a
+        # choice that stays made.
+        eng_orders = gui_list_box(lm_eng_buttons_items(client_id), lm_eng_buttons_box_style(), item_template=lm_eng_buttons_template, select=False)
+        # Nothing in comms rebuilds on a tick, so this is the only thing that repaints
+        # the menu when a condition flips, a submenu is entered, or the selection moves.
+        on change lm_eng_buttons_revision(client_id):
+            eng_orders.items = lm_eng_buttons_items(client_id)
 
 
-    yield idle
+    # The route ENDS here - no `yield idle`. A builder that parks on `yield idle` is
+    # CANCELLED by the next GUI build, and a cancelled task cannot be revived, so its
+    # `on change` handlers could stop. One that ends is revived when a handler fires,
+    # which is how normal_helm / normal_weap / normal_main already work.
 
 
 //gui/normal_helm
@@ -631,256 +712,3 @@ shared COMMS_PROTOTYPE  = SETTINGS.get("COMMS_PROTOTYPE", False)
         gui_layout_widget("3dview")
 
 
-####################################################################################
-## Prototype consoles
-=== mike_comms
-    # Left
-    gui_section(style="area:0,45px,100,100;")
-    
-    default tab = 1
-    # Top Left
-    
-    with gui_sub_section("col-width:280px;"):
-        gui_row("row-height: 400px;")
-        #gui_layout_widget("ship_data")
-        gui_info_panel(tab=tab)
-        gui_info_panel_add("message", 83, gui_panel_console_message,None, gui_panel_console_message_tick)
-        # The log/replay tab: every card ever filed, re-readable. Cards only take
-        # over the "message" tab when they interrupt (a button, or notify=True).
-        gui_info_panel_add("messages", 84, gui_panel_console_message_list, None)
-        # The ship's log (LOG_PANEL_PLAN.md). Same store on every console - it is the
-        # CREW's log - so what one console sees, all of them see.
-        gui_info_panel_add("log", 112, gui_panel_log, None, gui_panel_log_tick)
-        gui_info_panel_add("ship", 66, gui_panel_log_ship, None, gui_panel_log_tick)
-        gui_info_panel_add("mission", 85, gui_panel_log_mission, None, gui_panel_log_tick)
-
-        gui_row()
-        gui_blank()
-        
-        gui_row("row-height: 45px;margin:0,0,0,10px;")
-
-        follow_tag = get_inventory_value(client_id, "2d_follow", True)
-        # Set back in case of default
-        set_inventory_value(client_id, "2d_follow", follow_tag)
-        gui_checkbox("Follow","col-width:90px;", var="follow_tag")
-        on change follow_tag:
-            ship = viewscreen_home_ship(client_id)
-            _sel = get_comms_selection(ship)
-            set_inventory_value(client_id, "2d_follow", follow_tag)
-            comms_set_2dview_focus(client_id, _sel)
-
-        gui_row("row-height: 40px;")
-        gui_layout_widget("red_alert")
-
-
-
-    # Middle
-    recent_list = []
-    message_list = []
-
-    with gui_sub_section():
-        gui_row("row-height:30;")
-        with gui_sub_section():
-            # NOT gui_layout_widget + gui_hide. That reads as "place it, then hide it"
-            # and does neither: gui_layout_widget ADDS the widget to the console's widget
-            # list, which is what makes the engine draw it, and gui_hide only clears
-            # `_show` on the layout placeholder - so the waterfall stayed on screen. This
-            # prototype is where that pattern was copied FROM, and it cost real time
-            # twice; gui_hide now warns when handed an engine widget. Simply not asking
-            # for it is what keeps it off.
-            recent_listbox = gui_list_box(recent_list,"item-gap: 0.1em; background:#1572;", item_template=comms_recent_item, select=True)
-            history_listbox = gui_list_box(message_list,"item-gap: 0.1em; background:#1572;", item_template=comms_message_item, select=True)
-            ### Need library help to make better click area
-            history_text = gui_text_area("", "click_text:"";click_background:#0000:")
-            gui_hide(history_text)
-
-        gui_row("row-height:45px;")
-        gui_layout_widget("radar_zoom_ctrl")
-        gui_row()
-        gui_layout_widget("comms_2d_view")
-
-    await gui_sub_task_schedule(mike_comms_update)
-
-        
-    # Right
-    ss = gui_screen_size(client_id)
-
-    default select_2d = False
-    _widget = "comms_2d_view"
-    #if select_2d:
-    #    _widget = "comms_2d_view"
-    with gui_sub_section("col-width:25;"):
-        gui_row("row-height:100px;")
-        gui_layout_widget("comms_face")
-
-        gui_row("row-height:15;")
-        gui_property_list_box("Options")
-
-        gui_row()
-        gui_layout_widget("comms_control")
-
-
-
-        # gui_screen_size returns a 1024x768 PLACEHOLDER (z==99) until the client
-        # reports its size, which read as a small screen and cramped wide displays.
-        # When unknown, assume the LARGER layout - it degrades better.
-        if gui_screen_size_known(client_id) and ss.x < 1600:
-            gui_row("row-height: 35px;col-width:25px;")
-        else:
-            gui_row("row-height: 35px;col-width:45px;")
-
-
-        gui_row("row-height:20px;")
-        gui_blank()
-        gui_row() #"padding:0,25px,10px,0")
-        gui_layout_widget("comms_sorted_list")
-    
-    # Want to tetx and list box to occupy the same space
-    default history_bounds = None
-
-    on signal comms_message:
-        # Let shared signal get processed
-        await delay_sim(0)
-        await gui_sub_task_schedule(mike_comms_update, {"cm":COMMS_MESSAGE})
-        await gui_sub_task_schedule(mike_comms_update_select, {"other_id":COMMS_MESSAGE.other_id})
-
-
-    on change recent_listbox.click_time:
-        item = recent_listbox.get_value()
-        await gui_sub_task_schedule(mike_comms_update_history, {"other_id":item.other_id})
-        gui_hide(history_text)
-        gui_show(history_listbox)
-        
-        item = recent_listbox.get_value()
-        _ship_id = sbs.get_ship_of_client(client_id)
-        cur = get_comms_selection(_ship_id)
-        if cur != item.other_id:
-            follow_route_select_comms(_ship_id, item.other_id)
-        
-        
-    on signal comms_select:
-        # Had weird issues where it forgets SIGNAL_SELECT_ID
-        e = SIGNAL_SELECTED_ID
-        if SIGNAL_ORIGIN_ID == sbs.get_ship_of_client(client_id):
-            gui_sub_task_schedule(mike_comms_update_select, {"other_id":e})    
-
-
-
-    
-    on change history_listbox.click_time:
-        ht = history_listbox.get_value()
-        if ht is not None:
-            face =""
-            if ht.face is not None and ht.face!="":
-                face = f"![](face://{ht.face}?align=center)\n\n"
-            history_text.value = f"{face}$$color:{ht.title_color} {ht.title}\n\n$$color:{ht.message_color} {ht.message}\n\n"
-            # this needs library help
-            if history_bounds is None:
-                history_bounds = history_listbox.bounds
-                history_text.set_bounds(history_bounds)
-            gui_show(history_text)
-            gui_hide(history_listbox)
-    
-    on gui_message(history_text):
-        gui_hide(history_text)
-        gui_show(history_listbox)
-
-
-
-    yield idle
-
-=== mike_comms_update_select
-    prev = recent_listbox.value
-    recent_listbox.value = None
-    for i in recent_list:
-        if i.other_id == other_id:
-            recent_listbox.value = i
-    if prev != recent_listbox.value:
-        gui_hide(history_text)
-        gui_show(history_listbox)
-        gui_sub_task_schedule(mike_comms_update_history, {"other_id":other_id })
-    yield success
-
-=== mike_comms_update
-    default shared comms_recents = {}
-    default shared comms_history = {}
-    default cm = None
-
-    
-    _ship_id = sbs.get_ship_of_client(client_id)
-    yield fail if _ship_id == 0 or to_space_object(_ship_id) is None
-    yield fail if cm is not None and _ship_id != cm.player_id
-    # OK the new message is for our ship
-    ship_recent = comms_recents.get(_ship_id, {})
-    
-
-    
-    l = list(ship_recent.values())
-    recent_list = sorted(l, key=lambda cm: -cm.time)
-    cur = recent_listbox.value
-    new_sel = cur
-    if cm is not None and cur is None:
-        new_sel = cm
-
-    recent_listbox.items = recent_list
-    if new_sel is None:
-        yield success
-    # Reset the selection 
-    recent_listbox.value = new_sel
-    await gui_sub_task_schedule(mike_comms_update_history, {"other_id":new_sel.other_id})
-
-    yield success
-
-
-=== mike_comms_update_history
-    default shared comms_recents = {}
-    default shared comms_history = {}
-
-    _ship_id = sbs.get_ship_of_client(client_id)
-    yield fail if _ship_id == 0 or to_space_object(_ship_id) is None
-
-    other_obj = to_space_object(other_id)
-    if other_obj is None and other_id != 0:
-        sbs.send_comms_selection_info(_ship_id, "", "white", "--static--")
-
-    # OK the new message is for our ship
-    ship_history = comms_history.get(_ship_id, {})
-    ship_history_with_other = ship_history.get(other_id, [])
-    
-    history_listbox.items = ship_history_with_other
-
-    yield success
-
-//shared/signal/comms_message
-    default shared comms_recents = {}
-    default shared comms_history = {}
-    yield success if not COMMS_PROTOTYPE
-    
-    cm = COMMS_MESSAGE
-    player_id = cm.player_id
-    other_id = cm.other_id
-
-    r = comms_recents.get(player_id, {})
-    r[other_id] = cm
-    comms_recents[player_id] = r
-
-    ph = comms_history.get(player_id, {})
-    comms_history[player_id] = ph
-    oh = ph.get(other_id, [])
-    ph[other_id]=  oh
-    
-    oh.append(cm)
-
-
-# "player_id": from_id, 
-# "other_id": to_id,
-# "life_form_from__id": life_form_from__id,
-# "life_form_to__id": life_form_to__id,
-# "receive": is_receive,
-# "from_name": from_name_now, 
-# "face": face,
-# "title": raw_title,
-# "title_color": title_color,
-# "message": msg,
-# "message_color": title_color,
-# "time": FrameContext.co

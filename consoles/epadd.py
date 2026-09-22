@@ -20,6 +20,27 @@ def lm_epadd_unread():
     return f"{n} new"
 
 
+def lm_epadd_offers():
+    """The Offers tile's badge: how many jobs are on offer that nobody has taken.
+
+    Only on Offers. It used to sit on the Quests tile too, but the Quests tab lists only
+    work already taken, so "3 available" there advertised something it does not show.
+
+    Empty at zero, so the tile stays quiet rather than saying "0 available" - the same
+    rule the Messages badge follows.
+
+    Counts OFFERS, not quests: an accepted job is work in hand and does not belong in a
+    number whose whole promise is "there is something here you have not done". POSTING
+    jobs are excluded by offer_count for the same reason - they are listed so you know
+    they exist, but something else has to hand them to you.
+    """
+    from sbs_utils.procedural.offer import offer_count_here
+    n = offer_count_here()
+    if not n:
+        return ""
+    return f"{n} available"
+
+
 def lm_epadd_deliver_mail():
     """Send whatever is due. Called on a slow tick - mail that arrives while the crew
     is flying is the point; a pile that all landed at t=0 would be a document."""
@@ -39,19 +60,19 @@ def lm_epadd_reporting():
     return f"{n} reporting"
 
 
-def lm_epadd_away():
-    """The Away Team tile's badge: whether a party is forming, or where you are.
+def lm_epadd_boarding():
+    """The Boarding Party tile's badge: whether a party is forming, or where you are.
 
     Says nothing on a bridge console with no party open, so the tile stays quiet.
     """
-    from sbs_utils.procedural.away import (away_invitation, away_open_roster,
-                                           away_invite_title)
-    from sbs_utils.procedural.gui.away_gui import away_who
-    if away_who() is not None:
-        return away_invite_title()
-    if away_invitation() is None:
+    from sbs_utils.procedural.boarding import (boarding_invitation, boarding_open_roster,
+                                           boarding_invite_title)
+    from sbs_utils.procedural.gui.boarding_gui import boarding_who
+    if boarding_who() is not None:
+        return boarding_invite_title()
+    if boarding_invitation() is None:
         return ""
-    free = len(away_open_roster())
+    free = len(boarding_open_roster())
     if not free:
         return "full"
     return f"{free} place" if free == 1 else f"{free} places"

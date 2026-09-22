@@ -99,6 +99,12 @@ hangar_get_craft_data("terran")
 
     sbs.assign_client_to_ship(client_id, 0)
 
+    # ON THE FLIGHT DECK: the quest screens list this side's Flight Wing, not the carrier
+    # the console is about to be assigned to, and Back is the hangar's own again (a
+    # landing pilot's cockpit override is cleared).
+    hangar_use_flight_wing(client_id, side)
+    gui_tab_back_override_clear(client_id)
+
     # Hand back the comms role the cockpit borrowed (launch_to_cockpit). Only if THIS
     # is what granted it: a client that was already a comms console before it walked
     # into the hangar keeps what it came with.
@@ -161,8 +167,18 @@ hangar_get_craft_data("terran")
     # Persist the (possibly reset) selection back as ids for the next rebuild.
     ride_choice_id = to_id(ride_choice)
     dock_choice_id = to_id(dock_choice)
+    # THIS CRAFT'S SORTIES, as quests on the pilot's list. A sortie is an ordinary quest:
+    # picking a craft puts that craft's orders under Available Quests, where they are
+    # accepted like any other. Guarded because the sorties addon is optional.
+    if HANGAR_QUEST_DOC is not None:
+        hangar_offer_sorties(client_id, ride_choice_id)
 
-    gui_section(style="area: 0,0, 41,60;x-background: #fff1;")
+    # THE BOARD'S BAND, GIVEN TO THE THINGS THAT WERE SQUEEZED. The sortie list and its
+    # briefing used to own everything from y=60 down, so the craft pickers and the 2D
+    # view both stopped at 60 with a third of the screen below them. The orders live in
+    # the PADD now, so both grow to 100-90px - the top of the bottom control band, which
+    # is the highest thing under here (`area: 0,100-90px, 35,100`).
+    gui_section(style="area: 0,0, 41,100-90px;x-background: #fff1;")
 
     call_sign = get_inventory_value(client_id, "call_sign", "Selene")
     gui_section(style="area: 20px,6,40,6+40px;")
@@ -170,7 +186,7 @@ hangar_get_craft_data("terran")
     on change call_sign:
         set_inventory_value(client_id, "call_sign", call_sign)
 
-    gui_section(style="area: 20px,6+50px, 40, 60;")
+    gui_section(style="area: 20px,6+50px, 40, 100-90px;")
     
     # reveal keeps a restored selection ON SCREEN; hint keeps it in the same SLOT.
     # This page is a loop -- await gui() falls through to `jump show_hangar` -- so
@@ -218,30 +234,31 @@ hangar_get_craft_data("terran")
     gui_section(style="area: 41+1em,45px, 100,90px;")
     gui_layout_widget("radar_zoom_ctrl")
 
-    gui_section(style="area: 41+1em,90px, 100,60;")
+    # Down to the pointer line rather than to 60 - the same band the pickers took, on
+    # this side of the screen. A flight deck's radar is the thing a pilot reads before
+    # choosing a craft, and it was the smallest panel on the console.
+    gui_section(style="area: 41+1em,90px, 100,100-132px;")
     gui_layout_widget("2dview")
 
-    # Sortie board (quests addon only): the quest LIST and its briefing share one
-    # full-width band below the 2D view. Guarded by HANGAR_QUEST_DOC so the hangar
-    # console still works when the quests addon is not loaded.
+    # SORTIE ORDERS LIVE IN THE PADD NOW, not here. The board used to be a list and a
+    # briefing panel sharing the whole lower third of this screen, which made a sortie the
+    # one kind of work you could only see from ONE console - and only after walking to it.
+    # It is an offer like any other now: the Offers app lists it, from any console and
+    # from the cockpit, and this screen gets its band back.
+    #
+    # One line rather than nothing, because a flight deck that says nothing about orders
+    # reads as a flight deck that has none.
     cockpit_type = None
     quest_choice = None
-    quest_brief = "Select a sortie order"
+    # STILL DECLARED, and passed to hangar_hints_capture below. It already tolerates None
+    # (that was the "quests addon not loaded" case); leaving the name undefined instead
+    # would be a NameError on a line that looks untouched.
     quest_box = None
-    quest_brief_area = None
     if HANGAR_QUEST_DOC is not None:
         cockpit_type = hangar_cockpit_type(ride_choice)
-        gui_section(style="area: 20px,60, 50,100-90px;background: #1572;")
-        quest_box = gui_list_box(hangar_quest_items(HANGAR_QUEST_DOC, cockpit_type), "padding:0,0,10px,0;", item_template=hangar_quest_template, title_template=hangar_quest_title_template, select=True, reveal=True, hint=hangar_hint(hangar_hints, "quest"))
-
-        gui_section(style="area: 50,60, 100,100-90px;background: #1572;")
-        quest_brief_area = gui_text_area("{quest_brief}", style="tag:quest-brief;padding: 10px,15px,10px,15px;")
-        on change quest_box.get_value():
-            sel = quest_box.get_value()
-            if sel is not None:
-                quest_choice = sel.get("key")
-                quest_brief = sel.get("desc")
-                quest_brief_area.value = quest_brief
+        # Under the 2D view, in the strip left between it and the bottom controls.
+        gui_section(style="area: 41+1em,100-132px, 100,100-90px;")
+        gui_text("$text:Sortie orders - see Available Quests in the ePADD.;font:gui-2;color:#9ab;")
 
     fighter_change = 0
     ship_change_count = 0
@@ -257,13 +274,13 @@ hangar_get_craft_data("terran")
             if dock is not None:
                 sbs.assign_client_to_ship(client_id, dock.id)
 
-            # Cockpit type can change (fighter <-> shuttle); refresh the board.
+            # Cockpit type can change (fighter <-> shuttle), and a shuttle is offered
+            # different orders than a fighter - so the pilot's untaken orders are
+            # swapped for this craft's.
             if HANGAR_QUEST_DOC is not None:
                 cockpit_type = hangar_cockpit_type(ride_choice)
-                quest_box.items = hangar_quest_items(HANGAR_QUEST_DOC, cockpit_type)
                 quest_choice = None
-                quest_brief = "Select a sortie order"
-                quest_brief_area.value = quest_brief
+                hangar_offer_sorties(client_id, ride_choice_id)
 
             stats = hangar_get_stats(client_id, fighter)
             gui_update("stats-1", "$text: {stats[0]}")
@@ -361,8 +378,9 @@ hangar_get_craft_data("terran")
             old_ship_id = sbs.get_ship_of_client(client_id)
             unlink(old_ship_id, "consoles", client_id)
             link(ride_select , "consoles", client_id)
-            if quest_choice is not None and HANGAR_QUEST_DOC is not None:
-                hangar_assign_quest(to_id(ride_select), HANGAR_QUEST_DOC, cockpit_type, quest_choice)
+            # NOTHING TO ASSIGN AT LAUNCH. A sortie is a quest the pilot already
+            # accepted under Available Quests, held by the pilot, so it goes with them
+            # into the cockpit.
             jump launch_to_cockpit
         jump show_hangar
 
@@ -440,6 +458,12 @@ hangar_get_craft_data("terran")
     set_inventory_value(ride_select, "client_id", client_id)
     set_dedicated_link(client_id, "craft_id", ride_select)
     sbs.send_grid_selection_info(ride_select.id, "", "white", "")
+
+    # IN THE SEAT: every ePADD screen declares Back as CONSOLE_SELECT, which is still the
+    # hangar - so Back pulled the pilot out of the craft mid-flight. Send it to the
+    # cockpit until they land (show_hangar clears it). The quest screens keep the wing.
+    gui_tab_back_override(client_id, "cockpit")
+    hangar_use_flight_wing(client_id, ride_select)
 
     mission_objective = get_inventory_value(ride_select, "current_objective")
     if mission_objective:
@@ -557,6 +581,14 @@ hangar_get_craft_data("terran")
                 grav_tether.update("icon_index:54;color:#0ff")
             else:
                 grav_tether.update("icon_index:54;color:#fff")
+
+    # THE PADD, FROM THE SEAT. A sortie is an offer now, and an offer is reachable from
+    # any console's PADD - except this one, which is a hand-placed overlay with no tab
+    # strip at all. One button rather than giving the cockpit a strip: the cockpit is
+    # deliberately not a tabbed console, and a pilot wants a way to the job board, not a
+    # bar of tabs across the canopy.
+    padd = gui_button("icon_index:35;color:#fff", style="col-width:50px;",
+                      on_press="cockpit_padd", is_sub_task=True)
 
     gui_blank()
 
@@ -783,3 +815,27 @@ hangar_get_craft_data("terran")
 ### //damage/killed # if has_role(DAMAGE_SOURCE_ID, "cockpit")
 
 
+# THE WAY BACK INTO THE SEAT. `gui_tab_back` names a `//gui/tab`, so the PADD - and every
+# app opened from it - needs one pointing at the cockpit or its Back button is dead and a
+# pilot is stranded on a job board mid-flight. `gui_tab_enable` is per-console and
+# consumed each build, so declaring this puts a "cockpit" tab on nobody else's strip.
+//gui/tab/cockpit
+    jump show_cockpit
+
+
+=== cockpit_padd
+" The PADD, opened from the pilot's seat.
+"
+" Back goes to the COCKPIT rather than to CONSOLE_SELECT, which is still the hangar - the
+" pilot chose that console on the flight deck and then launched out of it. Sending them
+" back to the flight deck from a screen they opened while flying would be a teleport.
+" (launch_to_cockpit also sets gui_tab_back_override, so every app opened from here
+" does the same.)
+    gui_tab_back("cockpit")
+    _cp_ship = to_object(sbs.get_ship_of_client(client_id))
+    gui_app_home(ship_name=_cp_ship.name if _cp_ship is not None else "")
+    # A signal does not wake await gui(): without this the tiles freeze at whatever they
+    # said when the PADD was opened, so a sortie appearing never shows up.
+    on change gui_app_revision():
+        jump cockpit_padd
+    await gui()

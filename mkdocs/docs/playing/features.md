@@ -36,10 +36,50 @@ so updating the mission keeps them. A map chooses which options its code carries
 `GameCode:` list in its metadata; leave that out and it carries everything on the Options
 panel, plus the ships.
 
+## The Flight Wing
+
+Pilots have quests of their own. On the flight deck and in the cockpit, the quest
+screens list your own quests, the game's, and your side's **Flight Wing** &mdash; the
+quests every pilot of your side shares &mdash; rather than the carrier's. Pick a fighter
+or a shuttle and its sorties appear under **Available Quests**; accept them right there,
+on the flight deck or in the seat.
+
 ## Bonus objectives
 
 Optional **bonus objectives** give skilled crews extra goals to chase beyond simply
 surviving.
+
+## Quests offered { #side-jobs }
+
+Peacetime's patrol quests &mdash; gunnery drills, hazard rocks, poachers, rescues, tows and
+the multi-console arcs &mdash; are no longer tied to one map. A **Quests Offered** option on
+the setup panel deals a random hand of them under **Available Quests**:
+
+| Quests Offered | What is offered |
+|---|---|
+| **none** | nothing |
+| **few** | about a quarter of them |
+| **some** | about half |
+| **max** | all of them |
+
+Each quest waits under Available Quests until somebody **Accepts** it &mdash; select one to
+read what it asks and what it pays. Its targets only appear once it is taken on, and from
+then on it is on the **Quests** tab.
+
+**A seed deals the same hand.** Set the map's Seed and the same quests come up every time,
+so a shared game code gives everyone the same set. Seed 0 deals a fresh hand each game.
+
+Where you will find it:
+
+- **Peacetime Remastered** &mdash; Quests Offered defaults to **some**. It sits beside the
+  map's **Quest Size** option: *Quests Offered* picks **which** quests are offered, *Quest
+  Size* sets **how big** each one is (how many drones, rocks or hulks it takes).
+- **Siege** &mdash; Quests Offered defaults to **none**, so a siege plays as it always has
+  until you ask for work between waves. The gunnery hulks are target practice, not part of
+  the assault: you do not have to clear them to win.
+
+A host can change either default in [settings.yaml](../hosting/settings.yaml.md#siege_jobs)
+(`SIEGE_JOBS`, `PR_SIDE_JOBS`).
 
 ## Engineering: wear, tuning and work orders
 
@@ -75,7 +115,7 @@ finish what they were sent to do rather than wandering onto whatever they pass.
 |---|---|
 | **Selected** | The room or team you picked on the interior view, in full. |
 | **Orders** | Every work order on the ship, most urgent first, with raise and cancel on each row. |
-| **Systems** | The four system pools, and the eight effectiveness numbers &mdash; beam, tube, impulse, warp, turn, sensor, and both shield facings &mdash; each colored by how healthy it is. |
+| **Systems** | The four system pools, and the eight efficiency numbers &mdash; beam, tube, impulse, warp, turn, sensor, and both shield facings &mdash; each colored by how healthy it is. |
 
 The cockpit's system lights show the same tiers.
 

@@ -6,10 +6,15 @@ resolution, and it spent most of what space it had on the icon. The console owns
 that rectangle now.
 
 It is a `gui_tabbed_panel` with three tabs - Selected, Orders, Systems - so each one
-gets the WHOLE height of a row that is 587px tall at 1920 and only 227 at 1280x720,
-instead of three things sharing it badly. The tab strip is on the LEFT edge on
-purpose: 26px out of a 200-268px width costs ~10 percent of the axis that has room,
-where a top strip would cost 29px of the axis that collapses.
+gets the WHOLE height of the row, instead of three things sharing it badly.
+
+The tab strip is on TOP at 44px. It used to be 26px on the LEFT edge, argued for on
+the grounds that 26px out of a 200-268px width costs ~10 percent of the axis with room
+to spare while a top strip costs it from the axis that collapses. Two things changed
+that. A 26px tab is not a touch target - a finger wants 44 - and this column no longer
+collapses: retiring `grid_object_list` gave it back 200px plus a 2em spacer, so the
+panel's row is 337px at 1280x720 where it was 227. 48px off that is affordable; an
+unhittable tab never was.
 
 REVIEW NOTE: build this with `gui_tabbed_panel`, never `gui_info_panel`. Only the
 latter writes `page.pending_info_panel`, which is a singleton the left column's info
@@ -22,7 +27,8 @@ from sbs_utils.helpers import FrameContext, gui_text_escape
 from sbs_utils.procedural.gui import (gui_row, gui_text, gui_text_area, gui_list_box,
                                       gui_sub_section)
 from sbs_utils.procedural.gui.tabbed_panel import gui_tabbed_panel
-from sbs_utils.procedural.gui.icon import gui_icon_name, gui_icon_name_button
+from sbs_utils.procedural.gui.icon import (gui_icon, gui_icon_name,
+                                           gui_icon_name_button)
 from sbs_utils.procedural.gui.icon_sheet import icon_resolve
 from sbs_utils.procedural.query import (to_object, to_object_list, to_id, to_blob,
                                         get_grid_selection)
@@ -35,11 +41,14 @@ from sbs_utils.procedural.work_orders import (work_order_rows, work_orders_for,
                                               KIND_REPAIR, KIND_MAINTAIN,
                                               PRIORITY_LOW, PRIORITY_NORMAL,
                                               PRIORITY_HIGH, PRIORITY_CRITICAL)
-from sbs_utils.procedural.internal_damage import (grid_node_state, grid_system_states,
+from sbs_utils.procedural.internal_damage import (grid_node_state, grid_node_icon_index,
+                                                  grid_system_states,
                                                   grid_system_signature,
                                                   GRID_WORN_COLOR_DEFAULT,
                                                   GRID_TUNED_COLOR_DEFAULT)
 from sbs_utils.procedural.execution import log
+
+from eng_view import lm_eng_view_show, lm_eng_view_tick
 
 # --- tab bookkeeping ---------------------------------------------------------
 # Paths must not collide with the info panel's own (message / messages / log / ship /
@@ -48,12 +57,14 @@ from sbs_utils.procedural.execution import log
 ENG_TAB_SELECTED = "eng_sel"
 ENG_TAB_ORDERS = "eng_orders"
 ENG_TAB_SYSTEMS = "eng_systems"
+ENG_TAB_VIEW = "eng_view"
 
 # Where each tab caches the signature it last drew, on the PANEL - so it dies with
 # the panel and nothing has to be reset at a mission boundary.
 _SIG_ATTR = {ENG_TAB_SELECTED: "_eng_sig_sel",
              ENG_TAB_ORDERS: "_eng_sig_ord",
-             ENG_TAB_SYSTEMS: "_eng_sig_sys"}
+             ENG_TAB_SYSTEMS: "_eng_sig_sys",
+             ENG_TAB_VIEW: "_eng_sig_view"}
 
 # The panel's tick contract is 0 = done, 1 = stay, 2 = redraw. NEVER 0 here: 0 sends
 # the panel back to its default tab, which would yank the engineer off Orders once a
@@ -115,14 +126,23 @@ def _eng_node_color(node_id):
     return get_inventory_value(node_id, "color", "white")
 
 
-def _eng_header(title, icon_name=None, color=None, note=None):
+def _eng_header(title, icon_name=None, color=None, note=None, icon_index=None):
     """The small subtle glyph plus a name, as the first row of every tab.
 
     1.5em, not the 2.2em the sketch started at: at gui-2 that would be 53px, a fifth
     of the whole panel on a 720-tall screen, spent on a name.
+
+    `icon_index` wins over `icon_name` and is how the Selected tab draws a node's OWN
+    glyph - the one the interior view has it wearing. A sheet index rather than a name
+    because that is what the grid theme holds; a name here would mean maintaining a
+    second table that could disagree with the picture beside it.
     """
     gui_row("row-height: 1.5em;")
-    if icon_name:
+    if icon_index is not None:
+        with gui_sub_section("col-width: 1.4em;"):
+            gui_row()
+            gui_icon(f"icon_index:{int(icon_index)};color:{color or 'white'};")
+    elif icon_name:
         with gui_sub_section("col-width: 1.4em;"):
             gui_row()
             gui_icon_name(icon_name, color=color or "white")
@@ -151,8 +171,14 @@ def eng_panel_selected_show(cid, left, top, width, height):
         gui_text_area("$text:(pick a room or a team on the interior view);color:#888;")
         return
     is_crew = has_role(node_id, "damcons")
-    _eng_header(node.name, "person" if is_crew else "gear",
-                _eng_node_color(node_id), "crew" if is_crew else None)
+    # The node's own icon, not a stand-in. This header used to draw one `gear` for
+    # every room and system on the ship, so the glyph said nothing the title had not
+    # already said and did not match the node the engineer had just clicked.
+    # `grid_node_icon_index` answers with what the interior view is drawing, damcon
+    # teams included, and None (nothing drawn) for a node that has no icon at all.
+    _eng_header(node.name, None, _eng_node_color(node_id),
+                "crew" if is_crew else None,
+                icon_index=grid_node_icon_index(node_id))
     gui_row()
     # grid_selected_markdown lives in ai/grid_ai.py, next to the damcon status it
     # reads, and that is a DIFFERENT MASTLIB from this one.
@@ -266,7 +292,7 @@ def _eng_order_item(item, **kwargs):
     Sizes the ROWS and returns None, so the listbox calls resize_to_content().
     """
     color = "Crimson" if item["kind"] == KIND_REPAIR else GRID_WORN_COLOR_DEFAULT
-    gui_row("row-height: 1.2em;")
+    gui_row("row-height: 1.8em;")
     with gui_sub_section("col-width: 1.2em;"):
         gui_row()
         gui_icon_name("wrench" if item["kind"] == KIND_REPAIR else "gear", color=color)
@@ -274,12 +300,12 @@ def _eng_order_item(item, **kwargs):
     # data= on the button, never an `on gui_message` block in the loop: an inline
     # block captures the loop variable at its LAST value, so every row would act on
     # the last order drawn.
-    with gui_sub_section("col-width: 1.1em;"):
+    with gui_sub_section("col-width: 2em;"):
         gui_row()
         gui_icon_name_button("arrow-up", color="#9C92E8",
                              data={"target": item["target"]},
                              on_press=_eng_order_raise)
-    with gui_sub_section("col-width: 1.1em;"):
+    with gui_sub_section("col-width: 2em;"):
         gui_row()
         gui_icon_name_button("minus", color="#9C92E8",
                              data={"target": item["target"]},
@@ -334,7 +360,7 @@ ENG_COEFFICIENTS = (
 
 
 def eng_coefficient_values(ship_id):
-    """The derived effectiveness coefficients, as (label, percent) pairs.
+    """The derived efficiency coefficients, as (label, percent) pairs.
 
     The engine answers None for a blob field nothing has set, so every read is
     coalesced - an unguarded one raises `'NoneType' < int` on a real bridge while
@@ -401,7 +427,15 @@ def eng_panel_systems_show(cid, left, top, width, height):
     # bypasses the markdown pass for it - which is also why the dash is literal text
     # rather than a `-` bullet: a bullet is re-styled by the built-in `ul` style and
     # would come back the same blue as everything else.
-    lines = ["## Effectiveness"]
+    # `###`, not `##`: the tab's own title above it is gui-3 (`_eng_header`), so an h2
+    # sub-heading was a size LARGER than the title it sat under.
+    #
+    # It also has to FIT. This panel is 230px at 1280x720, its narrowest, and TextArea
+    # gives a line 20px less than that once the content scrolls (V_SCROLL_PX) - so a
+    # heading has 210px. "Effectiveness" at gui-4 measures 212px: over by two pixels,
+    # which the engine drew as "Effectivene" / "ss" on a bridge. "Efficiency" at gui-3
+    # is 133px. Pinned by TestHeadingsFitTheColumn.
+    lines = ["### Efficiency"]
     for label, pct in values:
         lines.append(f"$$color:{_eng_coefficient_color(pct)};font:gui-2;  - {label} {pct}%")
     gui_text_area("\n".join(lines))
@@ -431,21 +465,34 @@ def eng_panel_systems_tick(info_panel):
 
 
 # --- the panel ---------------------------------------------------------------
-# gear / wrench / gears. Raw sheet indices, because a tab icon is an index in the
-# TabbedPanel's own contract - not a name it resolves.
+# person / wrench / sitemap / gears. Resolved by NAME here and handed to TabbedPanel
+# as a sheet index, which is what its contract takes.
+#
+# Chosen from the strip as drawn, not from what the words suggest: `sitemap` reads as
+# a system diagram so it belongs to Systems, the small cogs read as settings so they
+# belong to View, and Selected gets `person` - the same glyph `_eng_header` already
+# draws for a damcon, so the tab and its contents agree.
 ENG_PANEL_TABS = (
-    (ENG_TAB_SELECTED, "gear", eng_panel_selected_show, eng_panel_selected_tick),
+    (ENG_TAB_SELECTED, "person", eng_panel_selected_show, eng_panel_selected_tick),
     (ENG_TAB_ORDERS, "wrench", eng_panel_orders_show, eng_panel_orders_tick),
-    (ENG_TAB_SYSTEMS, "gears", eng_panel_systems_show, eng_panel_systems_tick),
+    (ENG_TAB_SYSTEMS, "sitemap", eng_panel_systems_show, eng_panel_systems_tick),
+    # How the interior view draws rooms and systems. These four settings used to be
+    # comms buttons on the EPad - a grid object at icon_scale 0.01 that existed only
+    # to carry them. They belong beside the view they change, not on an object the
+    # engineer has to find.
+    (ENG_TAB_VIEW, "gears", lm_eng_view_show, lm_eng_view_tick),
 )
 
 
-def eng_grid_panel(tab=0, icon_size=26):
+def eng_grid_panel(tab=0, tab_location=2, icon_size=44):
     """Build Engineering's right-column panel into the CURRENT layout row.
 
     Args:
         tab (int, optional): which tab opens. Defaults to 0 (Selected).
-        icon_size (int, optional): tab strip width in px. Defaults to 26.
+        tab_location (int, optional): which edge the strip sits on. Defaults to 2
+            (top); 0 is left, 1 right, 3 bottom.
+        icon_size (int, optional): tab size in px. Defaults to 44, the smallest
+            reliable touch target.
 
     Returns:
         TabbedPanel | None
@@ -459,4 +506,5 @@ def eng_grid_panel(tab=0, icon_size=26):
             index = 0
         items.append({"path": path, "icon": index, "show": show, "hide": None,
                       "tick": tick})
-    return gui_tabbed_panel(items, tab=tab, tab_location=0, icon_size=icon_size)
+    return gui_tabbed_panel(items, tab=tab, tab_location=tab_location,
+                            icon_size=icon_size)

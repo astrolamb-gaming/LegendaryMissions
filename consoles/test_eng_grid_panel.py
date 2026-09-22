@@ -38,11 +38,13 @@ from sbs_utils.mast_sbs.maststorypage import StoryPage
 from sbs_utils.procedural.query import to_id
 from sbs_utils.procedural.roles import add_role
 from sbs_utils.procedural.links import link
+from sbs_utils.procedural.grid import grid_get_item_theme_data
 from sbs_utils.procedural.spawn import grid_spawn, player_spawn
 from sbs_utils.procedural.inventory import set_inventory_value
 from sbs_utils.procedural import work_orders as W
 
 from consoles import eng_grid_panel as P
+from consoles import eng_view as V
 from ai import grid_ai as G
 
 # The shared namespace is keyed by LIB_NAME, so `consoles` and `ai` are two separate
@@ -62,6 +64,16 @@ class _FakeMain:
 
 
 class _FakeGuiTask:
+    """Stands in for the GUI task a widget builder runs on.
+
+    Every method here mirrors the real `MastAsyncTask`'s behavior for a plain string,
+    because a stand-in that is missing a method the real task has fails the console
+    for a reason the console does not have: `format_string` was absent, so any style
+    carrying `background:` raised inside `apply_control_styles` - which a tabbed panel
+    swallows and draws as an EMPTY TAB. The View tab's chip rails were the first
+    widgets here to use one.
+    """
+
     def __init__(self, page):
         self.main = _FakeMain(page)
 
@@ -73,6 +85,36 @@ class _FakeGuiTask:
 
     def compile_and_format_string(self, s):
         return s
+
+    def format_string(self, message):
+        # MastAsyncTask.format_string returns a str unchanged and only interpolates
+        # non-str values; every style string reaching it here is already a str.
+        return "" if message is None else message
+
+    def get_symbols(self):
+        return {}
+
+    def get_id(self):
+        return id(self)
+
+    # What MessageHandler.on_message asks before running an on_press handler: was
+    # the owning task already finished before this click (button.py:147). A fake
+    # missing these does not fail the console - it fails the TEST, with an
+    # AttributeError that looks like a product bug until you read the traceback.
+    def done(self):
+        return False
+
+    class _Ticker:
+        done = False
+
+    active_ticker = _Ticker()
+
+    def start_sub_task(self, *a, **k):
+        # An INERT MessageHandler - one built with no on_press, which gui_button and
+        # gui_cycle_button both do - still falls through to start_sub_task(None, ...)
+        # by design (button.py is_inert). So the fake needs it even for a widget
+        # whose handler is attached with gui_message_callback instead.
+        return None
 
 
 class _FakePanel:
@@ -124,12 +166,15 @@ class PanelBase(unittest.TestCase):
             "grid_selected_UID", node_id or 0, 0)
 
     def shows(self):
+        # EVERY tab, the View one included. A tab that raises renders as an empty tab
+        # on the console - see the module docstring - so one left out of this tuple is
+        # a tab nothing is watching.
         return (P.eng_panel_selected_show, P.eng_panel_orders_show,
-                P.eng_panel_systems_show)
+                P.eng_panel_systems_show, V.lm_eng_view_show)
 
     def ticks(self):
         return (P.eng_panel_selected_tick, P.eng_panel_orders_tick,
-                P.eng_panel_systems_tick)
+                P.eng_panel_systems_tick, V.lm_eng_view_tick)
 
     def draw_all(self):
         for show in self.shows():
@@ -459,7 +504,7 @@ class TestOrderRowButtons(PanelBase):
 
 
 class TestCoefficientColors(PanelBase):
-    """The Effectiveness numbers are colored by tier so the pool that is hurting is
+    """The Efficiency numbers are colored by tier so the pool that is hurting is
     findable without reading eight of them. They must use the SAME four colors the
     glyph row and the grid use - a number that disagrees with the node it came from
     is worse than an uncolored one."""
@@ -497,11 +542,199 @@ class TestCoefficientColors(PanelBase):
             P.eng_panel_systems_show(CID, 0, 0, 200, 227)
         finally:
             P.gui_text_area = original
-        body = next((d for d in drawn if "Effectiveness" in d), None)
-        self.assertIsNotNone(body, "the Effectiveness block was not drawn")
+        body = next((d for d in drawn if "Efficiency" in d), None)
+        self.assertIsNotNone(body, "the Efficiency block was not drawn")
         styled = [ln for ln in body.split("\n") if ln.startswith("$$")]
         self.assertEqual(len(styled), len(P.eng_coefficient_values(self.ship)))
 
 
+class TestHeadingsFitTheColumn(PanelBase):
+    """A heading wider than the panel WRAPS MID-WORD.
+
+    `## Effectiveness` drew as "Effectivene" / "ss" on a bridge: gui-4 measures 212px
+    and this panel is 230px at 1280x720, its narrowest. The text area wraps by width
+    with no word awareness, so one character too many is a broken word, not a tidy
+    second line - and nothing in the layout says how wide the heading may be.
+
+    Pins the PROPERTY, not the word: whatever a heading says and whatever level it is
+    written at, it has to fit the narrowest column the console ever draws. A rename
+    keeps passing; a heading that outgrows the panel does not.
+    """
+
+    #: The narrowest this panel ever gets - measured off the real console layout at
+    #: 1280x720 (288/346/461px at 1600x900, 1920x1080, 2560x1440).
+    NARROWEST_PANEL_PX = 230
+
+    @property
+    def usable_px(self):
+        """What a LINE actually gets, which is not the panel width.
+
+        `TextArea` subtracts its vertical scrollbar from the wrap width whenever the
+        content scrolls (`pixel_width -= V_SCROLL_PX`), and both these tabs scroll at
+        1280x720. Taken from the library constant rather than written as 210, so this
+        follows the scrollbar if it is ever resized.
+
+        This margin is the whole bug: `Effectiveness` at gui-4 is 212px against 210px
+        usable - over by TWO PIXELS, which the engine drew as "Effectivene" / "ss".
+        A threshold of 230 would have called that passing.
+        """
+        from sbs_utils.pages.layout.text_area import TextArea
+        return self.NARROWEST_PANEL_PX - TextArea.V_SCROLL_PX
+
+    def _headings(self, show):
+        """Every markdown heading a tab emits, as raw lines."""
+        drawn = []
+        original = P.gui_text_area
+        P.gui_text_area = lambda props, style=None, **kw: drawn.append(props)
+        try:
+            show(CID, 0, 0, 200, 227)
+        finally:
+            P.gui_text_area = original
+        return [line for block in drawn for line in block.split("\n")
+                if line.startswith("#")]
+
+    def _measure(self, line):
+        """(font, text, width_px) for a heading line, read the way the text area
+        reads it - the level's font comes from TextArea.styles, not from a guess."""
+        from sbs_utils.pages.layout.text_area import TextArea
+        from sbs_utils.helpers import split_props
+        level = len(line) - len(line.lstrip("#"))
+        text = line.lstrip("#").strip()
+        style = TextArea.styles.get(f"h{level}")
+        self.assertIsNotNone(style, f"no style for a level-{level} heading: {line!r}")
+        font = split_props(style["style"], "font").get("font", "gui-3")
+        return font, text, mock_sbs.get_text_line_width(font, text)
+
+    def _assert_fits(self, show, what):
+        headings = self._headings(show)
+        self.assertTrue(headings, f"the {what} tab drew no heading at all")
+        for line in headings:
+            font, text, px = self._measure(line)
+            self.assertLess(
+                px, self.usable_px,
+                f"{what}: {text!r} at {font} measures {px}px against {self.usable_px}px "
+                f"usable - it wraps mid-word in the {self.NARROWEST_PANEL_PX}px panel")
+
+    def test_the_systems_headings_fit(self):
+        for i, r in enumerate(("weapon", "engine", "sensor", "shield")):
+            self.node(i, r, "__undamaged__")
+        self._assert_fits(P.eng_panel_systems_show, "Systems")
+
+    def test_the_selected_headings_fit(self):
+        """The same check next door, on the damcon branch - the only one that still
+        has a heading (`### Orders n`) now that the duplicated title is gone."""
+        room = self.node(0, "system", "weapon", "__damaged__")
+        dc = self.damcon(1)
+        link(dc, "work-order", room)
+        self.select(dc)
+        self._assert_fits(P.eng_panel_selected_show, "Selected")
+
+    def test_the_selected_tab_does_not_repeat_the_node_name(self):
+        """`_eng_header` draws the name above the body, with a glyph and an ellipsis.
+        The body drawing it again put it on screen twice, the second time a size
+        larger and unprotected - `Impulse Engine:3,4` measures 283px at gui-4 against
+        a 230px panel."""
+        room = self.node(0, "system", "weapon", "__damaged__")
+        self.select(room)
+        body = G.grid_selected_markdown(self.ship, room)
+        name = P.to_object(room).name
+        self.assertNotIn(name, body,
+                         f"the body repeats the node name {name!r} that the header "
+                         f"has already drawn")
+
+
 if __name__ == "__main__":
     unittest.main()
+
+class TestEveryTabIconResolves(PanelBase):
+    """An unknown icon name draws NOTHING and logs a warning nobody reads - the tab
+    looks dead, or falls back to index 0 and wears another tab's picture.
+
+    The View tab shipped with `eye`, which is not in the sheet.
+    """
+
+    def test_every_tab_has_a_real_icon(self):
+        from sbs_utils.procedural.gui.icon_sheet import icon_resolve
+        missing = [name for _path, name, _s, _t in P.ENG_PANEL_TABS
+                   if icon_resolve(name)[0] is None]
+        self.assertEqual(missing, [], f"not in the icon sheet: {missing}")
+
+    def test_no_two_tabs_share_an_icon(self):
+        from sbs_utils.procedural.gui.icon_sheet import icon_resolve
+        indexes = [icon_resolve(name)[0] for _p, name, _s, _t in P.ENG_PANEL_TABS]
+        self.assertEqual(len(set(indexes)), len(indexes),
+                         f"two tabs wear the same icon: {indexes}")
+
+class TestSystemGlyphsMatchTheGrid(PanelBase):
+    """The Systems tab's four glyphs must be the ones the INTERIOR VIEW draws.
+
+    A picture the grid never shows makes the engineer learn each system twice, and
+    the first set did that: a turbine for engines and a radar sweep for sensors,
+    neither of which is on any node. Each name is pinned to the cosmos theme's icon
+    for a room of that pool, so re-pointing a name in the sheet without moving the
+    theme (or the other way round) fails here rather than on a bridge.
+    """
+
+    #: pool -> the grid theme role whose icon it must wear. `weapon` covers beam and
+    #: torpedo rooms, which the theme draws differently; torpedo is the one chosen.
+    POOL_THEME_ROLE = {"weapon": "torpedo", "engine": "warp",
+                       "sensor": "sensor", "shield": "shield"}
+
+    def test_each_pool_wears_its_grid_icon(self):
+        from sbs_utils.procedural.gui.icon_sheet import icon_resolve
+        from sbs_utils.procedural.internal_damage import GRID_SYSTEM_ICONS
+        for pool, icon_name in GRID_SYSTEM_ICONS:
+            want = grid_get_item_theme_data(self.POOL_THEME_ROLE[pool]).icon
+            got = icon_resolve(icon_name)[0]
+            self.assertEqual(got, want,
+                             f"the {pool} indicator draws {icon_name!r} ({got}), but "
+                             f"the grid draws a {self.POOL_THEME_ROLE[pool]} room as "
+                             f"{want}")
+
+    def test_no_two_pools_share_a_glyph(self):
+        from sbs_utils.procedural.gui.icon_sheet import icon_resolve
+        from sbs_utils.procedural.internal_damage import GRID_SYSTEM_ICONS
+        indexes = [icon_resolve(n)[0] for _p, n in GRID_SYSTEM_ICONS]
+        self.assertEqual(len(set(indexes)), len(indexes),
+                         f"two system pools wear the same icon: {indexes}")
+
+
+class TestSelectedHeaderWearsTheNodeIcon(PanelBase):
+    """The Selected tab's header glyph is the node's OWN icon.
+
+    It used to be one `gear` for every room and system, which said nothing the title
+    had not already said and did not match the node just clicked on the view.
+    """
+
+    def _header_icons(self):
+        drawn = []
+        original = P.gui_icon
+        P.gui_icon = lambda props, style=None, **kw: drawn.append(props)
+        try:
+            P.eng_panel_selected_show(CID, 0, 0, 200, 227)
+        finally:
+            P.gui_icon = original
+        return drawn
+
+    def test_a_room_draws_the_icon_the_grid_gave_it(self):
+        room = self.node(0, "system", "weapon", "beam", "__undamaged__")
+        want = grid_get_item_theme_data("system,weapon,beam").icon
+        set_inventory_value(room, "icon_index", want)
+        self.select(room)
+        drawn = self._header_icons()
+        self.assertTrue(any(f"icon_index:{want};" in d for d in drawn),
+                        f"header icons were {drawn}, expected icon_index:{want}")
+
+    def test_a_damcon_draws_its_own_icon_too(self):
+        dc = self.damcon(1)
+        want = grid_get_item_theme_data("damcons").icon
+        set_inventory_value(dc, "icon_index", want)
+        self.select(dc)
+        drawn = self._header_icons()
+        self.assertTrue(any(f"icon_index:{want};" in d for d in drawn),
+                        f"header icons were {drawn}, expected icon_index:{want}")
+
+    def test_a_node_with_no_icon_anywhere_draws_nothing(self):
+        """None, not a stand-in glyph: a wrong icon looks deliberate."""
+        from sbs_utils.procedural.internal_damage import grid_node_icon_index
+        self.assertIsNone(grid_node_icon_index(0))
