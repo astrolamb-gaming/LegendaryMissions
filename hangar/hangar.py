@@ -622,8 +622,16 @@ def hangar_pilot_template(item):
     gui_row("row-height: 1.2em;padding:6px;")
     # Escape the user-entered call sign so ':' / ';' in it can't inject style (#569).
     gui_text(f"$text:{gui_text_escape(item.get('call_sign'))};justify: left;")
+    # FIVE EQUAL COLUMNS, not one string with the stats spaced out by hand: every row
+    # has the same five, so they line up down the list like a table and a pilot's
+    # kills sit under the pilot above's kills.
     gui_row("row-height: 1.0em;padding:6px;")
-    gui_text(f"$text:Sorties {item.get('sorties')}   Kills {item.get('kills')}   Tonnage Destroyed {item.get('tonnage')}   Damage Dealt {item.get('damage')}   Objectives {item.get('objectives')};justify: left;font:gui-1")
+    for label, key in _HANGAR_PILOT_STATS:
+        gui_text(f"$text:{label} {item.get(key)};justify: left;font:gui-1;")
+
+
+_HANGAR_PILOT_STATS = (("Sorties", "sorties"), ("Kills", "kills"), ("Tonnage", "tonnage"),
+                       ("Damage", "damage"), ("Objectives", "objectives"))
 
 
 def hangar_pilot_title_template():
@@ -711,23 +719,6 @@ def hangar_system_row_update(widgets, craft_id):
     for item, state in zip(widgets, states):
         gui_icon_recolor(item, state["color"])
     return True
-
-
-def get_dock_name(so):
-    """
-    Get the name of the home hangar of the specified craft.
-    Args:
-        so: the ID or object representing the craft
-    Returns:
-        str: The name of the craft's home ship or station.
-    """
-    dock = get_science_selection(so)
-    if not dock:
-        return ""
-    dock = to_space_object(dock)
-    if not dock:
-        return ""
-    return f"{dock.name}"
 
 def hangar_get_call_signs():
     ret = ["Aardvark","Badger","Chainsaw","Duckbill","Foxbat","Gargoyle","Hammerhead","Jellyfish","Kodiak","Lockjaw","Mongoose","Needlenose","Ostrich","Pancake","Rascal","Scarecrow","Tigershark","Vixen","Whiplash","Zealot"]

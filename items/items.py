@@ -13,7 +13,7 @@ from sbs_utils.procedural.inventory import get_inventory_value, set_inventory_va
 from sbs_utils.procedural.query import to_object
 from sbs_utils.procedural.sides import to_side_id
 from sbs_utils.procedural.signal import signal_emit
-from sbs_utils.procedural.timers import is_timer_finished, format_time_remaining
+from sbs_utils.procedural.timers import is_timer_finished, format_time_remaining, get_time_remaining
 from sbs_utils.procedural.gui import gui_row, gui_text
 from sbs_utils.helpers import gui_text_escape
 
@@ -73,6 +73,11 @@ def items_upgrade_tab_list(ship_id, include_unowned=False):
         cats = (lbl.get_inventory_value("type", "") or "").split("/")
         if "trade" in cats or "quest" in cats:
             continue
+        # A MATERIAL (salvage, bio sample) is carried and spent, never activated - its
+        # label has no effect - so an Activate button beside it would do nothing. It is
+        # declared, not guessed: `usable: false` (items/item_defs.mast). Cargo lists it.
+        if not _item_usable(lbl):
+            continue
         rows.append({
             "key": k,
             "name": lbl.get_inventory_value("display_text", k),
@@ -81,10 +86,37 @@ def items_upgrade_tab_list(ship_id, include_unowned=False):
             "consoles": lbl.get_inventory_value("consoles", "") or "",
             "ready": ready,
             "cd": "" if ready else format_time_remaining(ship_id, "item_cd_" + k),
+            # For the countdown BAR: seconds left, out of the effect's duration (the
+            # cooldown timer is set to exactly that - item_activate.mast).
+            "cd_left": 0 if ready else get_time_remaining(ship_id, "item_cd_" + k),
+            "cd_total": int(lbl.get_inventory_value("duration", 0) or 0),
         })
     # Held (or still counting down) first, then the catalog, each alphabetical.
     rows.sort(key=lambda r: (0 if (r["have"] > 0 or not r["ready"]) else 1, r["name"]))
     return rows
+
+
+def _item_usable(lbl):
+    """False for an item declared `usable: false` - see item_defs.mast."""
+    v = lbl.get_inventory_value("usable", True)
+    if isinstance(v, str):
+        return v.strip().lower() not in ("false", "no", "0", "off")
+    return v is not False
+
+
+def items_active_keys(ship_id):
+    """The items whose effect is still running on this ship, sorted - what the Upgrades
+    tab watches to know when a row stops saying "(active)".
+
+    One value that changes only when an effect STARTS or ENDS, so the tab rebuilds on
+    those and nothing else; the countdown in between is the bar updating itself.
+    """
+    out = []
+    for lbl in items_get_list():
+        k = lbl.get_inventory_value("key")
+        if k and not is_timer_finished(ship_id, "item_cd_" + k):
+            out.append(k)
+    return tuple(sorted(out))
 
 
 def item_upgrade_row(item):
@@ -167,7 +199,7 @@ def _purchasable_index(key):
     return None
 
 
-def market_disposition(station_id, key):
+def _market_disposition(station_id, key):
     """Station's price disposition for an item (1.0 if not finite-seeded)."""
     seed_key = get_inventory_value(station_id, "market_seed_key", None)
     if seed_key is None:
@@ -183,7 +215,7 @@ def market_price(station_id, key, ship_id=None):
     undiscounted list price (e.g. sell payouts)."""
     lbl = item_get(key)
     base = (lbl.get_inventory_value("price", 0) or 0) if lbl is not None else 0
-    price = base * market_disposition(station_id, key)
+    price = base * _market_disposition(station_id, key)
     if ship_id is not None:
         ship = to_object(ship_id)
         if ship is not None and ship.side:
