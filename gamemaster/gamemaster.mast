@@ -846,6 +846,8 @@ ship: None
         pos = Vec3(EVENT.source_point)
         if SCIENCE_SELECTED_ID!=0:
             pos = Vec3(SCIENCE_SELECTED.pos)
+        pos.y -= 1
+        # This is probably the cause of #403
         SCIENCE_ORIGIN.pos = pos
         comms_id = SCIENCE_SELECTED_ID
         if comms_id==0:
@@ -873,6 +875,7 @@ ship: None
     set_science_selection(COMMS_ORIGIN_ID, COMMS_SELECTED_ID)
     if COMMS_SELECTED_ID!=0:
         pos = Vec3(COMMS_SELECTED.pos)
+        pos.y -= 1
         gamemaster_show_nav_area(COMMS_ORIGIN_ID, pos, 0, "Game Master", "lmb", "#040")
         set_inventory_value(COMMS_ORIGIN_ID, "gamemaster_prev_selection", COMMS_SELECTED_ID)
 
