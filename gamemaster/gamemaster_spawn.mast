@@ -1,3 +1,12 @@
+
+# Here we just throw in default values for sliders, to avoid having them always start at 0. 
+# Better to give the user and idea of what the default value is. 
+MONSTER_SCALE = 1.0
+NEB_DENSITY = 1.0
+BH_RADIUS = 5000
+BH_GRAV_STR = 4.0
+BH_TURB_STR = 2.0
+BH_DAMAGE = 200
 //gui/normal_gamemaster
     # This shoudn't actually do anything. It's mostly here to prevent `gm_menu_spawn` from running immediately on startup without being attached to a gui.
     ->END
@@ -320,53 +329,22 @@ priority: 40
 === gm_menu_terrain
 metadata: ``` yaml
 type: gm_menu/terrain
-icon_index: Terrain 
+icon_index: 30
 icon_color: "#999872"
 priority: 80 # Smaller number is higher priority
+prefab_type: prefab/terrain/asteroid
+type_name: Asteroid
+settings:
+    Main:
+        # Name: 'gui_input("$text:;desc:Asteroid Field Name",var="AST_NAME")'
+        # Use Marker: 'gui_checkbox("$text:Use Marker;", var="AST_MARKER")'
+        Density: 'gui_int_slider("low:0.1;high:20;text:float;",var="AST_DENSITY")'
+variables:
+    # name: AST_NAME
+    density_scale: AST_DENSITY
+    # marker: AST_MARKER
+    use_gm_size: true # only use this if you want to use the GM NavArea size as the SIZE_* arguments of the prefab. Most prefabs don't use it, so it's usually not necessary.
 ```
-    with gui_sub_section():
-        gui_row("row-height: 1.5em;")
-        gui_text("Asteroid Spawn Settings")
-        gui_row("row-height: 0.5em; background-color: #122048;")
-        gui_blank()
-
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Density;")
-        # gui_blank()
-        asteroid_use_default_density = gui_checkbox("$text:Use Default;")
-
-        gui_row("row-height: 1.5em;")
-        asteroid_density = gui_slider("low:0;high:100;text:float;")
-        
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Shape:;","col-width: content;")
-
-        asteroid_prefabs = labels_get_type("prefab/terrain/asteroid")
-
-        gui_row()
-        asteroid_shape_list = gui_list(asteroid_prefabs, select=True)
-        with asteroid_shape_list as prefab:
-            display_text = prefab.get_inventory_value("display_text")
-            if display_text is None:
-                display_text = prefab.get_inventory_value("type").replace("prefab/terrain/","").replace("asteroid/","").replace("nebula/","")
-            gui_text(f"$text:{display_text};","background-color: #123123")
-        asteroid_shape_list.set_selected_index(0)
-        
-        gui_row("row-height: 1.5em;")
-        spawn_asteroid_button = gui_button("$text:Spawn Asteroids")
-
-        on gui_message(spawn_asteroid_button):
-            gm = sbs.get_ship_of_client(client_id)
-            pos = gamemaster_get_pos(gm)
-            size = gamemaster_get_size(gm)
-            lbl = asteroid_shape_list.listbox.value
-            if not asteroid_use_default_density.value:
-                data={"density_scale":asteroid_density.value,"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size}
-            else:
-                data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size}
-            prefab_spawn(lbl, data=data)
-
-    yield success
 
 === gm_menu_terrain_nebulae
 metadata: ``` yaml
@@ -374,61 +352,28 @@ type: gm_menu/terrain/nebula
 icon_index: 44
 icon_color: "#95357d"
 priority: 300 # Smaller number is higher priority
+prefab_type: prefab/terrain/nebula # you'll want to change this of course
+type_name: Nebula
+settings:
+    Main:
+        Name: 'gui_input("$text:;desc:Nebula Name",var="NEB_NAME")'
+        Use Marker: 'gui_checkbox("$text:Use Marker;", var="NEB_MARKER")'
+        Density: 'gui_int_slider("low:0.1;high:20;text:float;",var="NEB_DENSITY")'
+        Color:
+variables:
+    name: NEB_NAME
+    density_scale: NEB_DENSITY
+    cluster_color: NEB_COLOR
+    marker: NEB_MARKER
+    use_gm_size: true
 ```
-    with gui_sub_section("background-color: #95357d22;"):
-        gui_row("row-height: 1.5em;")
-        gui_text("Nebula Spawn Settings")
-        gui_row("row-height: 0.5em; background-color: #122048;")
-        gui_blank()
 
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Density;")
-        nebula_use_default_density = gui_checkbox("$text:Use Default;")
+    color_list = ["purple","red","blue","yellow","green","orange","white","custom"]
+    props = f"$text:purple;list:{','.join(color_list)};"
 
-        gui_row("row-height: 1.5em;")
-        nebula_density = gui_slider("low:0;high:100;text:int;")
-
-        gui_row("row-height: 1.5em;")
-        color_list = ["purple","red","blue","yellow","green","orange","white","custom"]
-        nebula_color_dd = gui_drop_down(f"$text:purple;list:{','.join(color_list)};")
-
-
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Shape:;","col-width: content;")
-
-        nebula_prefabs = labels_get_type("prefab/terrain/nebula")
-
-        gui_row()
-        nebula_shape_list = gui_list(nebula_prefabs, select=True)
-        with nebula_shape_list as prefab:
-            display_text = prefab.get_inventory_value("display_text")
-            if display_text is None:
-                display_text = prefab.get_inventory_value("type").replace("prefab/terrain/","").replace("asteroid/","").replace("nebula/","")
-            gui_text(f"$text:{display_text}")
-        nebula_shape_list.set_selected_index(0)
-
-        gui_row("row-height: 1.5em;")
-        neb_use_marker = gui_checkbox("$text:Use Marker;")
-        gui_row("row-height: 1.5em;")
-        nebula_name_input = gui_input("$text:;desc:Nebulae Name;")
-        
-        gui_row("row-height: 1.5em;")
-        spawn_nebula_button = gui_button("$text:Spawn Nebulae")
-
-        on gui_message(spawn_nebula_button):
-            gm = sbs.get_ship_of_client(client_id)
-            pos = gamemaster_get_pos(gm)
-            size = int(gamemaster_get_size(gm))
-            neb_color = nebula_color_dd.value
-            lbl = nebula_shape_list.listbox.value
-            neb_name = nebula_name_input.value
-            if not nebula_use_default_density.value:
-                data={"density_scale":nebula_density.value,"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size, "cluster_color":neb_color, "marker": neb_use_marker.value, "name": neb_name}
-            else:
-                data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size, "cluster_color":neb_color, "marker": neb_use_marker.value, "name": neb_name}
-            prefab_spawn(lbl, data=data)
-
-    yield success
+    # We can manually add settings as is done here:
+    settings["Main"]["Color"] = f"gui_drop_down('{props}', var='NEB_COLOR')"
+    jump gm_menu_reusable_spawn_logic
 
 
 === gm_menu_terrain_planets
@@ -437,203 +382,122 @@ type: gm_menu/terrain/planets
 icon_index: 13
 icon_color: "#5c3b18"
 priority: 400 # Smaller number is higher priority
+prefab_type: prefab/terrain/planet # you'll want to change this of course
+type_name: Planet
+settings:
+    Main:
+        Name: 'gui_input("$text:;desc:Planet Name",var="PLANET_NAME")'
+        Radius: 'gui_int_slider("low:200;high:10000;text:int;",var="PLANET_RADIUS")'
+variables:
+    name: PLANET_NAME
+    planet_radius: PLANET_RADIUS
 ```
-    with gui_sub_section():
+    jump gm_menu_reusable_spawn_logic
 
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Planet Spawn Settings")
-
-        gui_row("row-height: 0.5em; background-color: #122048;")
-        gui_blank()
-
-        gui_row("row-height: 1.5em;")
-        gui_text("$text: Planet Radius:")
-        gui_row("row-height: 1.5em;")
-        planet_radius_slider = gui_slider("low:200;high:10000;text:int;")
-
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Select Planet Type:;","col-width: content;")
-
-        planet_prefabs = labels_get_type("prefab/terrain/planet")
-
-        gui_row()
-        planet_type_list = gui_list(planet_prefabs, select=True)
-        with planet_type_list as prefab:
-            display_text = prefab.get_inventory_value("display_text")
-            if display_text is None:
-                display_text = prefab.get_inventory_value("type").replace("prefab/terrain/","").replace("asteroid/","").replace("nebula/","")
-            gui_text(f"$text:{display_text}")
-        planet_type_list.set_selected_index(0)
-
-        gui_row("row-height: 1.5em;")
-        planet_use_marker = gui_checkbox("$text:Show Planet Name;")
-
-        gui_row("row-height: 1.5em;")
-        planet_name_input = gui_input("$text:;desc:Planet Name;")
-        
-        gui_row("row-height: 1.5em;")
-        spawn_planet_button = gui_button("$text:Spawn Planet")
-
-        on gui_message(spawn_planet_button):
-            gm = sbs.get_ship_of_client(client_id)
-            pos = gamemaster_get_pos(gm)
-            size = int(gamemaster_get_size(gm))
-            radius = planet_radius_slider.value
-            # TODO: Add color options for planets
-            lbl = planet_type_list.listbox.value
-            if planet_use_marker.value:
-                planet_name = planet_name_input.value
-            else:
-                planet_name = ""
-            data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"planet_radius":radius, "name": planet_name}
-            prefab_spawn(lbl, data=data)
-    yield success
-
-
-=== gm_menu_terrain_other
-metadata: ```
-type: gm_menu/terrain/other
+=== gm_menu_terrain_bh
+metadata: ``` yaml
+type: gm_menu/terrain/black_hole
 icon_index: 7
-icon_color: " #000000"
-priority: 500
+icon_color: "#000000"
+priority: 400
+prefab_type: prefab/terrain/black_hole
+type_name: Black Hole
+settings:
+    Main:
+        Name: 'gui_input("$text:;desc:Black Hole Name",var="BH_NAME")'
+        Gravity Radius: 'gui_int_slider("low:500;high:10000;text:int;",var="BH_RADIUS")'
+        Gravity Strength: 'gui_int_slider("low:0.1;high:10;text:float;",var="BH_GRAV_STR")'
+        Turbulence Strength: 'gui_int_slider("low:0.1;high:10;text:float;",var="BH_TURB_STR")'
+        Collision Damage: 'gui_int_slider("low:10;high:1000;text:int;",var="BH_DAMAGE")'
+variables:
+    name: BH_NAME
+    gravity_radius: BH_RADIUS
+    gravity_strength: BH_GRAV_STR
+    turbulence_strength: BH_TURB_STR
+    collision_damage: BH_DAMAGE
 ```
-    with gui_sub_section():
-        default gravity_radius = 5000
-        default gravity_strength = 4.0
-        default turbulence_strength = 2.0
-        default collision_damage=200
-
-        gui_row("row-height: 1.5em;")
-        bh_name = gui_input("$text:;desc: Naming Black Holes Is Not Currently Functional;")
-
-        gui_row("row-height: 1.5em;")
-        gravity_radius_input = gui_input("$text:5000;desc:Gravity Radius;")
-
-        gui_row("row-height: 1.5em;")
-        gravity_strength_input = gui_input("$text:4.0;desc: Gravity Strength;")
-
-        gui_row("row-height: 1.5em;")
-        turbulence_strength_input = gui_input("$text:2.0;desc: Turbulence Strength;")
-
-        gui_row("row-height: 1.5em;")
-        collision_damage_input = gui_input("$text:200;desc: Collision Damage;")
-
-        gui_row("row-height: 1.5em;")
-        spawn_black_hole = gui_button("Spawn Black Hole")
-        
-        on gui_message(spawn_black_hole):
-            gravity_radius = safe_int(gravity_radius_input.value, 5000)
-            gravity_strength = safe_int(gravity_strength_input.value, 4.0)
-            turbulence_strength = safe_int(turbulence_strength_input.value, 2.0)
-            collision_damage = safe_int(collision_damage_input.value, 200)
-
-            gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
-            if gm is None:
-                debug_print("gm object is None")
-                jump END
-            pos = gamemaster_get_pos(gm, "lmb")
-
-            bh = await prefab_spawn(prefab_black_hole, data={"gravity_radius": gravity_radius, "gravity_strength": gravity_strength, "turbulence_strength": turbulence_strength, "collision_damage": collision_damage, "START_X": pos.x, "START_Y": pos.y, "START_Z": pos.z})
-
-            #TODO: It seems that black holes currently can't have names.... lame.
-            # name = bh_name.value
-            # obj = to_object(bh)
-            # if name is not None and obj is not None:
-            #     obj.set_name(name)
-
-        gui_row()
-        gui_blank()
-
-    yield success
+    jump gm_menu_reusable_spawn_logic
 
 #endregion
 
-=== gm_menu_test
+# TODO: Adding another submenu to terrain causes the submenu icons to scrunch up incorrectly
+# But I don't know why and it's driving me nuts
+# But realistically it's not a big deal, there's probably not other terrain that needs to be used
+# === gm_menu_terrain_other
+# metadata: ``` yaml
+# type: gm_menu/terrain/other
+# icon_index: 7
+# icon_color: "#000000"
+# priority: 400
+# prefab_type: prefab/terrain/other
+# type_name: Other
+# settings:
+#     Main:
+#         Name: 'gui_input("$text:;desc:Other Name",var="OTHER_NAME")'
+# variables:
+#     name: OTHER_NAME
+# ```
+#     jump gm_menu_reusable_spawn_logic
+
+=== gm_menu_spawn_monsters
 metadata: ```
-type: gm_menu/station/test
-icon_index: 1
-icon_color: " #000000"
-priority: 600
+type: gm_menu/monsters
+icon_index: 78
+icon_color: "#fb00ff" # Pink like monsters in-game
+priority: 85
+prefab_type: prefab/monster
+type_name: Monster
 settings:
     Main:
-        Name: 'gui_input("$text:;desc:Object Name",var="OBJ_NAME")'
-        Radius: 'gui_slider("low:200;high:10000;text:int;",var=OBJ_RADIUS)'
+        Name: 'gui_input("$text:;desc:Monster Name",var="MONSTER_NAME")'
+        Scale: 'gui_int_slider("low:0.1;high:10;text:float;",var="MONSTER_SCALE")'
+variables:
+    name: MONSTER_NAME
+    scale: MONSTER_SCALE
 ```
-    data={"prefab_type":"prefab/terrain/planet","type_name":"Planet","settings":settings}
-    await gui_sub_task_schedule(gm_menu_reusable_spawn_logic, data=data)
+    jump gm_menu_reusable_spawn_logic
 
-    yield success
 
 #region Reusable Spawn Logic
 
 === gm_menu_reusable_spawn_logic
-" Use this to set up spawn menus in an extensible manner.
-" The `settings` option is the most useful part. It takes the functions listed and automatically generates the appropriate handlers etc.
-" Each setting requires a `function` key, with the name of the function as the value.
-" The `var_name` key can be used to use a particular variable name to refer to the layout item generated by the function. Layout items using `var_name` can also get the layout item after this task is run, e.g.: 
-" `task = await gui_sub_task_schedule(gm_menu_reusable_spawn_logic, data=data)`
-" `layout_item = task.get_inventory_value("var_name_here") `
-" `var_name` is also the name of variables that are passed to the spawn prefab.
-" For example, prefab_black_hole has a `gravity_radius` parameter, so that var name should be used with a layout item that specifies the value for that parameter.
-" `style` can be used to specify a custom style for the layout item, e.g. `col-width: content;`
+" Use this to set up spawn menus in an extensible manner. 
+" The `settings` and `variables` values are critical. 
+" `settings` defines a property_list_box that incorporates gui layout items into the UI. 
+" `variables` tells the spawn logic which layout item should be used for required metadata keys in the prefab (e.g. radius for planets)
+" `extra_roles` is a comma-separated list of roles that should be added to any object spawned using this logic. This can be used to do other, custom stuff when these objects are spawned.
 " Position (START_X, etc) and size (SIZE_X, etc) are included by default, even if they are not used.
-metadata: ```
-prefab_type: prefab/terrain/asteroid # you'll want to change this of course
-type_name: Asteroid
-settings:
-    Main:
-        Name: 'gui_input("$text:;desc:Object Name",var="OBJ_NAME")'
+" All other metadata keys must be specified in `variables`. It's up to the user to determine what keys are required for any given label type. 
+    # metadata: ```
+    # # prefab_type: prefab/terrain/asteroid # you'll want to change this of course
+    # # type_name: Asteroid
+    # # settings:
+    # #     Main:
+    # #         Name: 'gui_input("$text:;desc:Object Name",var="OBJ_NAME")'
+    # # variables:
+    # #     NAME: OBJ_NAME
+    # extra_roles:
+    # ```
+        # gui_set_variable(f"settings_{prefab_type}", settings)
+        # settings = gui_get_variable("settings_{prefab_type}")
 
-```
+    default type_name = "Name Not Provided"
+
+    if mast_task.get_inventory_value("prefab_type") is None:
+        print("Could not find prefab type")
+        print(type_name)
+        yield fail
+    else:
+        # TODO: Not sure why, but `prefab_type` wasn't being converted to a variable as expected.
+        prefab_type = mast_task.get_inventory_value("prefab_type")
+
     with gui_sub_section():
-        # default settings = list()
-        default prefab_type = "prefab/terrain/asteroid"
-        default type_name = "Asteroid"
+
         gui_row("row-height: content;")
-        gui_property_list_box_stacked(f"{type_name} Settings", f"GM_GLB_SPAWN_{prefab_type}")
-        gui_properties_set(settings,f"GM_GLB_SPAWN_{prefab_type}")
-        # gui_row("row-height: 1.5em;")
-        # gui_text(f"{type_name} Spawn Settings")
-
-        # # Just a spacer
-        # gui_row("row-height: 0.5em; background-color: #122048;")
-        # gui_blank()
-
-        # var_dict = dict()
-
-        # for setting in settings:
-        #     function_name = setting.get("function")
-        #     if function_name is None:
-        #         continue
-        #     function_exec = gm_get_mast_global_function(function_name)
-        #     if function_exec is None:
-        #         continue
-        #     attributes = setting.keys()
-
-        #     props = ""
-        #     var_name = f"var_{len(var_dict.keys())}"
-        #     style = None
-        #     for a in attributes:
-        #         if a == "function":
-        #             continue
-        #         if a == "var_name":
-        #             var_name = setting.get(a)
-        #             continue
-        #         if a == "style":
-        #             style = setting.get(a)
-        #             continue
-        #         attribute = setting.get(a)
-        #         # if a == "text":
-        #         #     a = "$text"
-        #         props += f"{a}:{attribute};"
-
-        #     gui_row("row-height: 1.5em;")
-        #     layout_item = function_exec(props)
-        #     var_name = setting.get("var_name")
-        #     self.set_inventory_value(var_name, layout_item)
-        #     var_dict[var_name] = layout_item
-
-
+        listbox_tag = f"GM_GLB_SPAWN_{prefab_type}"
+        # print(listbox_tag)
+        lb = gui_property_list_box_stacked(f"{type_name} Settings", listbox_tag)
+        gui_properties_set(settings, listbox_tag)
 
         gui_row("row-height: 1.5em;")
         gui_text("$text:Shape:;","col-width: content;")
@@ -645,29 +509,57 @@ settings:
         with prefab_list as prefab:
             display_text = prefab.get_inventory_value("display_text")
             if display_text is None:
-                display_text = prefab.get_inventory_value("type").replace(f"{prefab_type}/","")
+                if prefab_type is None:
+                    print("Fail")
+                    yield fail
+                if f"{prefab_type}/" in prefab.get_inventory_value("type"):
+                    display_text = prefab.get_inventory_value("type","").replace(f"{prefab_type}/","")
+                if display_text is None:
+                    display_text = prefab.name
             gui_text(f"$text:{display_text}")
         prefab_list.set_selected_index(0)
 
-        obj_name_input = gui_input(f"$text:;desc:{type_name} Name;")
-        
+        # obj_name_input = gui_input(f"$text:;desc:{type_name} Name;")
+
         gui_row("row-height: 1.5em;")
-        spawn_obj_button = gui_button(f"$text:Spawn {type_name}")
+
+        # We have to pass explicit "variables" values to the button, or it all gets messed up
+        # with other panels' spawn logic
+        spawn_obj_button = gui_button(f"$text:Spawn {type_name}", data={"variables": variables, "listbox":prefab_list.listbox, "prefab_type":prefab_type})
 
         on gui_message(spawn_obj_button):
             gm = sbs.get_ship_of_client(client_id)
             pos = gamemaster_get_pos(gm)
             size = int(gamemaster_get_size(gm))
-            lbl = prefab_list.listbox.value
-            data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"SIZE_X":size,"SIZE_Z":size}
-            get_variable()
-            # # Now we iterate over all the var_dict keys and values
-            # keys = var_dict.keys()
-            # for key in keys:
-            #     layout_item = var_dict.get(key)
-            #     value = layout_item.value
-            #     data[key] = value
-            # prefab_spawn(lbl, data=data)
+            # lbl = prefab_list.listbox.value
+            button_variables = __ITEM__.data.get("variables",dict())
+            lbl = __ITEM__.data.get("listbox").value
+            data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z}
+            if button_variables.get("use_gm_size"):
+                data["SIZE_X"] = size
+                data["SIZE_Z"] = size
+            name = ""
+            # Now we USE the variables saved on the button
+            for prefab_var in button_variables.keys():
+                if prefab_var in "use_gm_size":
+                    continue
+                layout_item_var = button_variables.get(prefab_var)
+
+                # Give the writer a warning without a MAST crash if you set up variables wrong
+                if not isinstance(layout_item_var, str):
+                    prefab_type = __ITEM__.data.get("prefab_type","")
+                    print(f"\nERROR in GM Menu: values for `variables` must be a string\n    Trying to spawn {prefab_type}")
+                    print(f"Key: {prefab_var}")
+                    print(f"Value (should be a string!): {layout_item_var}")
+                    continue
+                liv = gui_get_variable(layout_item_var)
+                if liv is not None:
+                    data[prefab_var] = liv
+                if prefab_var == "name":
+                    name = liv
+                
+            # Finally, we actually spawn the prefab
+            spawned = await prefab_spawn(lbl, data=data)
 
     yield success
 #endregion

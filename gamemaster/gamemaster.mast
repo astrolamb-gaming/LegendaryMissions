@@ -155,7 +155,10 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
             gss_row = gui_row()
             gss = gui_sub_section()
             with gss:
-                await gui_sub_task_schedule(m)
+                data = m.inventory.collections
+                if m.get_inventory_value("display_text") is None:
+                    data["display_text"] = m.name
+                await gui_sub_task_schedule(m,data)
             if menu_panel is not None:
                 gss_row.show(False)
             else:
@@ -172,7 +175,7 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
             # Now we handle submenus.
             # First we will make a new sub section to handle the tabs.
             tab_row = gui_row(f"row-height: {GAMEMASTER_CONSOLE_ICON_SIZE}px;")
-            tab_section = gui_sub_section()
+            # tab_section = gui_sub_section()
             sorted_subs = sorted(list(subs.values()), key=lambda item: item.get_inventory_value("priority", 1000))
 
             # Build the submenu buttons
@@ -190,7 +193,7 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
                 if icon_color is None:
                     icon_color = "#404ad8"
                 if isinstance(icon, int) or icon.isdigit():
-                    button = gui_icon_button(f"icon_index: {icon};color: {icon_color};", "color: #01234567;", data={"menu_type": m_type, "submenu_index": sub_index}, on_press="gm_sidebar_select_submenu")
+                    button = gui_icon_button(f"icon_index: {icon};color: {icon_color};", "color: #01234567; col-width: square;", data={"menu_type": m_type, "submenu_index": sub_index}, on_press="gm_sidebar_select_submenu")
                 else:
                     button = gui_button(f"$text: {icon}; color: {icon_color};", " col-width: content;", data={"menu_type": m_type, "submenu_index": sub_index}, on_press="gm_sidebar_select_submenu")
                 buttons.append(button)
@@ -200,7 +203,11 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
                 sub_section_row = gui_row()
                 content_section = gui_sub_section()
                 with content_section:
-                    await gui_sub_task_schedule(sub)
+                    # and we build the contents here by runnning the label.
+                    data = sub.inventory.collections
+                    await gui_sub_task_schedule(sub,data)
+
+                # Now we handle showing/hiding the applicable rows (the row contains the sub section, which contains the layout)
                 if sub_index == selected_submenu_index:
                     gui_show(sub_section_row)
                 else:

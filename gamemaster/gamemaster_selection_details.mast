@@ -37,7 +37,7 @@ priority: 120
     print(f"Beams: {len(beams)}")
 
     beam_list_box = gui_list_box(beams, "", gm_list_box_beam_info)
-    gui_sub_task_schedule(gm_selected_beams_update, data={"gm":gm, "lb":beam_list_box})
+    gui_sub_task_schedule(gm_selected_beams_update, data={"gm":gm, "lb_gm_sel_beams_update":beam_list_box})
     yield success
 
 === gm_selected_beams_update
@@ -46,15 +46,15 @@ gm:
 lb:
 ```
     yield fail if gm is None
-    yield fail if lb is None
+    yield fail if lb_gm_sel_beams_update is None
     # gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
     selected = get_inventory_value(gm, "gamemaster_prev_selection")
     beams = gm_get_beam_data_for(selected)
-    lb.items = beams
+    lb_gm_sel_beams_update.items = beams
     on change get_inventory_value(gm, "gamemaster_prev_selection"):
         selected = get_inventory_value(gm, "gamemaster_prev_selection")
         beams = gm_get_beam_data_for(selected)
-        lb.items = beams
+        lb_gm_sel_beams_update.items = beams
     yield success
 
 
@@ -86,14 +86,14 @@ priority: 30
     selected = get_inventory_value(gm, "gamemaster_prev_selection")
     torps = gm_torp_get_data_for(selected)
     with sec:
-        lb = gui_list_box(torps,"",item_template=gm_list_box_loadout_info)
+        lb_gm_sel_loadout = gui_list_box(torps,"",item_template=gm_list_box_loadout_info)
 
         on change get_inventory_value(gm, "gamemaster_prev_selection"):
             # if not sec.is_hidden:
             selected = get_inventory_value(gm, "gamemaster_prev_selection")
             torps = gm_torp_get_data_for(selected)
-            lb.items = torps
-            gui_represent(lb)
+            lb_gm_sel_loadout.items = torps
+            gui_represent(lb_gm_sel_loadout)
     yield success
 
 

@@ -1,10 +1,8 @@
 from sbs_utils.mast.mast_globals import debug_print, MastGlobals
 from sbs_utils.procedural.style import apply_control_styles
-from sbs_utils.agent import Agent
 from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
 from sbs_utils.procedural.gui.message import gui_message
 from sbs_utils.procedural.gui.section import gui_sub_section
-from sbs_utils.procedural.gui.ship import gui_ship
 from sbs_utils.procedural.ship_data import get_ship_data, get_ship_data_for
 from sbs_utils.procedural.gui.button import gui_button
 from sbs_utils.procedural.gui.icon import gui_icon
@@ -13,13 +11,7 @@ from sbs_utils.procedural.query import get_science_selection, get_weapons_select
 from sbs_utils.procedural.links import linked_to
 from sbs_utils.helpers import FrameContext, gui_text_escape
 from sbs_utils.vec import Vec3
-from sbs_utils import yaml
-from sbs_utils.procedural.gui.listbox import gui_list_box
-from sbs_utils.procedural.gui.dropdown import gui_drop_down
-from sbs_utils.procedural.comms import comms_broadcast
-from sbs_utils.procedural.roles import role
-from sbs_utils.procedural.gui import gui_task_for_client, gui_region
-from sbs_utils.procedural.execution import gui_sub_task_schedule, labels_get_type, gui_get_variable, AWAIT, gui_set_variable
+from sbs_utils.procedural.execution import labels_get_type, gui_get_variable, AWAIT, gui_set_variable
 
 
 def gamemaster_show_nav_area(ORIGIN_ID, pos, size_delta, text, selection_type, color):
