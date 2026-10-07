@@ -265,16 +265,10 @@ shared game_stats = ~~{
             q_desc = gui_text_area("{q_sel_desc}", style="padding:10px,15px,10px,15px;")
             on change quest_box.get_value():
                 qsel = quest_box.get_value()
-                if qsel is not None and not gui_list_box_is_header(qsel):
-                    q_sel_desc = quest_log_pane_text(qsel)
-                    q_desc.value = q_sel_desc
-                elif qsel is not None:
-                    # Selecting an ARC shows its description + step checklist here too -
-                    # same renderer as the in-game tab, so both logs read alike.
-                    q_sel_desc = quest_log_parent_summary(qsel)
-                    if q_sel_desc == "":
-                        q_sel_desc = "Select a quest to see its details."
-                    q_desc.value = q_sel_desc
+                # A quest's facts and description, or an ARC's description and step
+                # list - the same renderer as the in-game tab, so both logs read alike.
+                # One call, never an assignment: see quest_tab.mast.
+                quest_log_pane_show(q_desc, qsel, "Select a quest to see its details.")
 
     if RESULTS_TAB == "enemies":
         # Races with no kills are omitted rather than listed as zero - and a mod's own
@@ -314,6 +308,10 @@ shared game_stats = ~~{
     default shared RESULTS_SAVED = False
     ->END if RESULTS_SAVED
     RESULTS_SAVED = True
+    # A run that is not a game - a test, a probe, a lesson being checked - says so with
+    # the setting GAME_RESULTS_SAVE: false, and leaves no record. The file keeps the last
+    # GAME_RESULTS_MAX games, so every record that is not a game pushes a real one out.
+    ->END if not SETTINGS.get("GAME_RESULTS_SAVE", True)
 
     # Keep only the most recent games so the file stays small and quick to open.
     # Records now carry the dense per-ship / per-pilot / quest breakdown (more than
@@ -322,9 +320,10 @@ shared game_stats = ~~{
     default shared GAME_RESULTS_MAX = 200
 
     results_file = get_missions_dir() + "/game_results.yaml"
-    results = load_yaml_data(results_file)
-    if results is None or not isinstance(results, list):
-        results = []
+    # A list, or None when the file could neither be read nor moved aside - in which
+    # case nothing is written, because writing would destroy it.
+    results = game_results_load(results_file)
+    ->END if results is None
 
     end_ticks = sim.time_tick_counter - game_stats.get("start_time", sim.time_tick_counter)
     # Timestamp comes from a python helper (results_helpers.py): datetime's strftime

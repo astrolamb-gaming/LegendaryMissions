@@ -13,20 +13,41 @@ silently shadowing), so a future sbs_utils field called `Named` or `Hook` fails 
 instead of quietly changing what LM's files mean.
 """
 from sbs_utils.procedural.amd_schema import (amd_register_fields, text, integer, pct,
-                                             csv, makeup, multiline)
+                                             csv, makeup, multiline, enum)
+
+try:
+    from sbs_utils.procedural.amd_schema import named_hulls
+except ImportError:
+    # An sbs_utils from before `named_hulls` existed. The field still reads the same -
+    # it is a comma list either way - it just is not checked.
+    named_hulls = csv
+
+try:
+    from sbs_utils.procedural.amd_vocab import amd_register_shared_folder
+except ImportError:
+    # An sbs_utils from before shared folders could be declared. Siege still reads the
+    # folder; the tools just do not know it is part of this mission.
+    def amd_register_shared_folder(name, beside=None):
+        pass
 
 
 def _declare_lm_vocabulary():
+    # An author's own Siege bosses live in <missions>/common_data/bosses, where an update
+    # to this mission cannot delete them (maps/siege_boss.py reads both folders). Saying
+    # so here is what makes `sbs lint` and the editor read those files with these words.
+    amd_register_shared_folder("bosses", beside="maps/bosses")
+
     # A BOSS record - the root of maps/bosses/*.amd. `Boss` resolves to the map archetype
     # (a file's root record names the whole document), so these hang off map.
     amd_register_fields("map", {
-        "trigger": text(hint="what summons the boss, e.g. enemies_low"),
+        "trigger": enum("enemies_low", "continuous",
+                        hint="what summons the boss: enemies_low or continuous"),
         "low": pct(hint="30% - the enemy count that counts as thinned out"),
         "flies": makeup(hint="pirate, or 60% Kralien, 20% Torgoth, 20% Arvonian"),
         "fleets": integer(hint="how many escort fleets arrive with it"),
         "difficulty": text(hint="+2 - a modifier ON the map's difficulty, not a level"),
-        "named": csv(hint="Ragnarok tsn_juggernaut, XORN tsn_light_cruiser"),
-        "wave": integer(hint="which wave this boss belongs to"),
+        "named": named_hulls(hint="Ragnarok tsn_juggernaut, XORN tsn_light_cruiser"),
+        "wave": integer(hint="45 - seconds between waves, for a continuous boss"),
         "hook": text(hint="the label/signal that stages the encounter"),
     }, domain="LegendaryMissions")
 

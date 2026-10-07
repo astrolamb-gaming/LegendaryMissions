@@ -12,6 +12,28 @@ A boss is up to two co-located files:
 | `maps/bosses/<key>.amd` | **yes** | the boss **config** (how it spawns) + its **objectives** |
 | `maps/bosses/<key>.mast` | optional | boss-specific **logic / comms** (only if the boss needs bespoke behavior) |
 
+## Where your own boss goes
+
+Not in `maps/bosses/`. That folder belongs to LegendaryMissions, and an update replaces
+the whole mission folder - a boss you added there is gone afterwards.
+
+Put your `.amd` in the shared folder beside the saves:
+
+```
+data\missions\common_data\bosses\
+```
+
+Siege reads both folders, so your boss is in the **Boss** list next to the shipped ones,
+and no update touches it. The folder is made the first time Siege looks for it.
+
+| | |
+|---|---|
+| What goes there | the boss's `.amd` file only |
+| Bespoke MAST | not from this folder: a boss's own `.mast` has to live in a mission. `Hook:` can still name any label the mission already has |
+| A name already taken | your boss replaces the shipped one of that name in the list, and `mast.runtime.log` says so. Rename the heading to keep both |
+| Checking it | `sbs lint common_data\bosses` checks only your bosses, with the Siege's own fields and keys. `sbs lint LegendaryMissions` lists them too |
+| In the editor | a boss opened from this folder is read as part of LegendaryMissions: the boss fields are known and `siege_mission` resolves |
+
 The `.amd` is authored in the **shared AMD quest vocabulary** — the same grammar
 Open Universe uses — so learning to write a Siege boss is a stepping stone to
 authoring a full universe.
@@ -40,7 +62,9 @@ A raider warlord and their honor guard warp in to break the defenders.
 <!-- amd:end -->
 
 The heading text (`Warlord`) is what shows in the **Boss** dropdown; the key
-(`warlord`) matches the filename.
+(`warlord`) matches the filename. The dropdown offers bosses by that text, so it must be
+unique: two files that both say `[Warlord]` put one entry in the list. `sbs lint` flags
+the duplicate.
 
 ### Config fields
 
@@ -51,7 +75,7 @@ The heading text (`Warlord`) is what shows in the **Boss** dropdown; the key
 | `Flies:` | Race makeup for the boss's fleets — a single race or a weighted mix. | `50% Kralien, 50% Torgoth` |
 | `Fleets:` | How many fleets to spawn (wave size). | `2` |
 | `Difficulty:` | Boss difficulty relative to the game's, or absolute. `+2` / `-1` / `7`. | `+1` |
-| `Named:` | Named flagship hulls — `Name shipDataKey`, comma-separated. | `Warlord kralien_dreadnought` |
+| `Named:` | Named flagship hulls — `Name shipDataKey`, comma-separated. The name is **one word**: `Iron Duke kralien_dreadnought` is a ship called `Iron` on a hull called `Duke`. `sbs lint` flags it. | `Warlord kralien_dreadnought` |
 | `Wave:` | (continuous) Seconds between waves. | `45` |
 | `Hook:` | A MAST label to run for bespoke behavior beyond the config spawn (see [Hooks](#hooks)). | `biomech_infestation` |
 
@@ -87,12 +111,17 @@ Destroy the raider Warlord to break the siege for good.
 | `Part of:` | The quest this one belongs under, by key. | `Parent:` |
 | `Reward:` | What COMPLETING it gives - credits, an item key, or a reputation clause. | `Pays:` |
 | `Required:` | Whether the mission needs this one completed to succeed. |  |
-| `Fatal:` | Failing this ENDS the mission. | `Critical:` |
+| `Fatal:` | Failing this FAILS the quest it is `Part of:`. That loses the game only if the parent says `Lose:`. | `Critical:` |
 <!-- amd:end -->
 
 Parenting to `siege_mission` is what joins the objective to the siege's mission tree,
-so it counts toward the end-game. `Done when: destroy 1 warlord` counts kills of
-anything with the `warlord` role — which the `Named:` flagship carries automatically.
+so it counts toward the end-game. `Done when: signal siege_won` completes it when the
+Siege reports every raider gone — the boss's ships included, since they arrive as
+raiders. To finish on the flagship alone, write `Done when: destroy 1 warlord`: a
+`Named:` flagship carries its own name, lower-cased, as a role.
+
+The objective is `Scope: shared`, so its `Reward:` pays every side that has a player
+ship, once each.
 
 ---
 
@@ -115,6 +144,17 @@ Hook: biomech_infestation
 **reusable behavior belongs in an addon**, and the boss just points at it. Keep
 boss-*specific* logic in the boss's own `.mast`.
 
+**A hook that names a label the mission does not have is left out.** The boss still
+arrives, with her ships and her objectives, and `mast.runtime.log` says the hook was not
+found. (It used to stop the game on the runtime-error page as she arrived.)
+
+**A hook for a boss of your own** - one kept in `common_data/bosses` - cannot live beside
+it: that folder holds `.amd` files only. Without editing a shipped file, the hook can go in
+a folder of its own inside this mission, `LegendaryMissions/<your_boss>/__init__.mast`,
+which is found and compiled like any addon. That folder is inside the mission an update
+replaces, so keep a copy and put it back afterwards; until you do, the boss arrives
+without her hook.
+
 ---
 
 ## The logic file: `<key>.mast`
@@ -133,27 +173,27 @@ defection is a `//comms` route gated on the `xorn` role (only present when Ragna
 spawns) and `SIEGE_ACTIVE`, so loading it for every game never mis-fires:
 
 ```
-//comms if SIEGE_ACTIVE and has_role(COMMS_SELECTED_ID, "xorn") and not has_role(COMMS_SELECTED_ID, "defected")
+//comms if SIEGE_ACTIVE and has_any_role(COMMS_ORIGIN_ID, "__player__") and has_role(COMMS_SELECTED_ID, "xorn") and not has_role(COMMS_SELECTED_ID, "defected")
     + "Appeal to Xorn: turn on Ragnarok":
         <<[cyan] "XORN"
-            % Ragnarok betrayed the fleet. I am yours.
-        remove_role(COMMS_SELECTED_ID, "raider")
+            % Ragnarok led us to ruin. I am done taking orders - point me at the flagship.
         add_role(COMMS_SELECTED_ID, "defected")
         COMMS_SELECTED.side = COMMS_ORIGIN.side
         brain_clear(COMMS_SELECTED_ID)
-        brain_add(COMMS_SELECTED_ID, "ai_chase_npc", {"force_shoot": True, "throttle": 2.2})
+        brain_add(COMMS_SELECTED_ID, "ai_chase_npc", {"force_shoot": True, "throttle": 2.2, "enemies_only": True})
         signal_emit("quest_signal", {"SIGNAL_NAME": "xorn_defected"})
 ```
 
-The `signal_emit("quest_signal", …)` completes the `When: signal xorn_defected`
+The `signal_emit("quest_signal", …)` completes the `Done when: signal xorn_defected`
 objective — this is how boss logic and boss objectives talk to each other.
 
 ---
 
 ## Add a boss in three steps
 
-1. **Write `maps/bosses/<key>.amd`** — a `# [Display](key)` heading with the config
-   fields, and one or more `##` objectives parented to `siege_mission`.
+1. **Write `<key>.amd`** — a `# [Display](key)` heading with the config fields, and one
+   or more `##` objectives parented to `siege_mission`. Your own boss goes in
+   `common_data\bosses\`; one that ships with LegendaryMissions goes in `maps/bosses/`.
 2. **(Optional) add `maps/bosses/<key>.mast`** for bespoke comms/logic, gated on your
    boss's role/flag, and `import bosses/<key>.mast` in `maps/__init__.mast`.
 3. **Playtest** — the boss is already in the **Boss** dropdown (folder scan). Verify

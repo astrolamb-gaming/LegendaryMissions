@@ -9,6 +9,14 @@ siege.mast spawns the selected boss's forces on `siege_enemies_low` and grants i
 objectives onto the siege_mission tree.
 
 Drop a new .amd in maps/bosses/ and it appears in the dropdown with no code change.
+
+TWO FOLDERS. `maps/bosses/` is this mission's own, and it is replaced whenever the
+mission is updated - `sbs fetch` deletes and re-extracts a mission folder - so a boss an
+author dropped there was lost on the next update. The second folder is theirs:
+`<missions>/common_data/bosses/`, beside the saves, which no update touches. A boss in
+either appears in the list. An author's boss is a .amd file only: per-boss MAST lives in
+the mission and cannot be loaded from outside it, though `Hook:` can still name any
+label the mission has.
 """
 import os
 import random
@@ -18,7 +26,35 @@ from sbs_utils.procedural.amd_quest import amd_quest_facts
 from sbs_utils.procedural.quest import document_get_amd_file
 
 _BOSS_DIR = "maps/bosses"
+_SHARED_BOSS_DIR = "bosses"          # under common_data: the author's own, kept on update
 _bosses = None   # cache: Display -> boss node
+
+
+_TRIGGERS = ("enemies_low", "continuous")
+
+
+def _problem(data, label, value, why):
+    """Note a line the game cannot read. The boss is then LEFT OUT of the list and the
+    log says which line (`siege_boss_scan`).
+
+    Each of these used to do something else, and none of them said so: `Trigger:
+    enemy_low` was a boss that never arrived; `Low: forty percent` and `Difficulty: +two`
+    stopped the game on the runtime-error page seconds in; `Fleets: three` made the whole
+    file unreadable, and the Boss list offered an entry called "Could not read this
+    document" in its place. Defaulting instead would play a boss the author did not
+    write - so it is not offered at all, with one line that names the file and the value.
+    """
+    data.setdefault("problems", []).append(
+        "`%s: %s` %s" % (label.capitalize(), str(value).strip(), why))
+
+
+def _whole(data, key, label, value):
+    """A whole number from 0 up, else a problem."""
+    n = amd_num(value)
+    if isinstance(n, (int, float)) and float(n) == int(n) and n >= 0:
+        data[key] = int(n)
+    else:
+        _problem(data, label, value, "is not a whole number from 0 up")
 
 
 def _boss_facts():
@@ -30,16 +66,31 @@ def _boss_facts():
             return True
         if label == "trigger":
             data["trigger"] = str(value).strip().lower()
+            if data["trigger"] not in _TRIGGERS:
+                _problem(data, label, value, "is not `enemies_low` or `continuous`")
         elif label == "low":
-            data["low"] = amd_pct(value)                 # "25%" -> 0.25
+            low = amd_pct(value)                         # "25%" -> 0.25
+            if not isinstance(low, float) or low < 0:
+                _problem(data, label, value, "is not a share of the raiders - write `Low: 40%`")
+            else:
+                # `Low: 40`, the sign left off, is 40% - not forty times the raiders,
+                # which meant "arrive at once".
+                if "%" not in str(value) and low > 1.0:
+                    low = low / 100.0
+                data["low"] = min(low, 1.0)
         elif label == "wave":
-            data["wave"] = int(amd_num(value))           # seconds between waves (continuous)
+            _whole(data, "wave", label, value)           # seconds between waves (continuous)
         elif label == "flies":
             data["makeup"] = amd_makeup(value)           # "50% Kralien, 50% Torgoth"
         elif label == "fleets":
-            data["fleets"] = int(amd_num(value))
+            _whole(data, "fleets", label, value)
         elif label == "difficulty":
-            data["difficulty"] = str(value).strip()      # "+2" | "-1" | "7"
+            text = str(value).strip()                    # "+2" | "-1" | "7"
+            data["difficulty"] = text
+            body = text[1:] if text[:1] in "+-" else text
+            if not body.isdigit() or (text[:1] not in "+-" and not 1 <= int(body) <= 11):
+                _problem(data, label, value,
+                         "is not a level from 1 to 11, or a step such as `+2` or `-1`")
         elif label == "named":
             named = []
             for item in str(value).split(","):           # "Name art, Name art"
@@ -57,24 +108,76 @@ def _boss_data(text):
     return amd_parse_facts(text, _boss_facts())
 
 
+def siege_boss_shared_folder():
+    """The author's own boss folder: `<missions>/common_data/bosses`. Made on demand, so
+    there is somewhere to put a file the first time anybody looks for it."""
+    from sbs_utils.fs import get_common_data_dir
+    folder = os.path.join(get_common_data_dir(), _SHARED_BOSS_DIR)
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except OSError:
+        pass                     # a read-only install simply has no shared bosses
+    return folder
+
+
+def siege_boss_folders():
+    """Every folder bosses are read from, in order: the mission's own, then the author's."""
+    return [get_mission_dir_filename(_BOSS_DIR), siege_boss_shared_folder()]
+
+
+def _say(message):
+    """Where an author will see it: `mast.runtime.log`, the log everybody reads."""
+    import logging
+    logging.getLogger("mast.runtime").warning("Siege boss: " + message)
+
+
 def siege_boss_scan(force=False):
-    """Scan maps/bosses/*.amd -> {Display: boss node}. Cached (force=True to rescan)."""
+    """Scan the boss folders -> {Display: boss node}. Cached (force=True to rescan).
+
+    THE AUTHOR'S BOSS WINS A NAME. The shared folder is read second, so a boss there with
+    a name the mission already uses replaces it in the list - and says so. The other
+    rule would make an author's own file silently absent, which is the worse surprise:
+    the usual way to get here is copying a shipped boss and forgetting to rename the
+    heading, and "my boss is not in the list" gives nothing to go on.
+    """
     global _bosses
     if _bosses is not None and not force:
         return _bosses
     _bosses = {}
-    folder = get_mission_dir_filename(_BOSS_DIR)
-    try:
-        files = sorted(f for f in os.listdir(folder) if f.lower().endswith(".amd"))
-    except OSError:
-        files = []
-    for fn in files:
-        doc = document_get_amd_file(os.path.join(folder, fn), data_parser=_boss_data)
-        for node in doc.get("children", []):             # one boss per file (first heading)
-            d = node.get("data") or {}
-            display = d.get("display") or node.get("display_text") or node.get("key")
-            _bosses[str(display)] = node
-            break
+    shared = siege_boss_shared_folder()
+    for folder in siege_boss_folders():
+        try:
+            files = sorted(f for f in os.listdir(folder) if f.lower().endswith(".amd"))
+        except OSError:
+            files = []
+        for fn in files:
+            try:
+                doc = document_get_amd_file(os.path.join(folder, fn), data_parser=_boss_data)
+            except Exception as e:                       # noqa: BLE001
+                # One unreadable file must not take the whole boss list with it.
+                _say("%s could not be read (%s: %s) - it is left out of the list"
+                     % (fn, type(e).__name__, e))
+                continue
+            for node in doc.get("children", []):         # one boss per file (first heading)
+                d = node.get("data") or {}
+                if node.get("key") == "__amd_error__":
+                    # The reader does not raise on a file it cannot parse: it hands back
+                    # a stand-in record, which this list then OFFERED as a boss called
+                    # "Could not read this document".
+                    _say("%s could not be read (%s) - it is left out of the list"
+                         % (fn, str(node.get("description") or "").strip()[:160]))
+                    break
+                if d.get("problems"):
+                    _say("%s is left out of the Boss list: %s. Fix the line and start "
+                         "the mission again." % (fn, "; ".join(d["problems"])))
+                    break
+                display = str(d.get("display") or node.get("display_text") or node.get("key"))
+                if folder == shared and display in _bosses:
+                    _say("%s in common_data/bosses is named '%s', which this mission "
+                         "already has - yours is the one in the list. Rename the "
+                         "heading to keep both." % (fn, display))
+                _bosses[display] = node
+                break
     return _bosses
 
 
@@ -147,6 +250,32 @@ def siege_boss_race(sel):
 def siege_boss_named(sel):
     """List of (name, art) named flagship hulls for the boss (may be empty)."""
     return list(_bdata(sel).get("named", []))
+
+
+def siege_boss_hook_ready(sel):
+    """The boss's `Hook:` label when the story HAS a label by that name, else ''.
+
+    A hook is MAST, and a boss file is not: the label lives in some addon, or in a folder
+    the author added to the mission. When it is not there - a typo, or the folder went
+    with an update - `prefab_spawn` of the name was "Calling undefined label" on the
+    runtime-error page at the moment the boss arrived, with her ships and objectives
+    already in the game. Now the boss arrives without her hook, and the log says why.
+    """
+    name = str(siege_boss_hook(sel) or "").strip()
+    if not name:
+        return ""
+    try:
+        from sbs_utils.helpers import FrameContext
+        mast = FrameContext.mast
+        labels = getattr(mast, "labels", None)
+        if labels is not None and name not in labels:
+            _say("the boss '%s' says `Hook: %s`, and no label in this mission has that "
+                 "name, so she arrives without it. A hook is a MAST label: check the "
+                 "spelling, and that its file is still in the mission" % (sel, name))
+            return ""
+    except Exception:                                    # noqa: BLE001
+        pass
+    return name
 
 
 def siege_boss_hook(sel):
