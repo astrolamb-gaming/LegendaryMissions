@@ -136,14 +136,14 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
 
     # Now we set up the contents section.
     # We need to build sub sections for each menu, but hide all but the current one.
-    contents = gui_section(f"area: {GAMEMASTER_CONSOLE_ICON_SIZE}px, 40px,{info_panel_width}, 100;")
+    contents = gui_section(f"area: {GAMEMASTER_CONSOLE_ICON_SIZE}px, 40px,{info_panel_width}, 100; background-color: #203d5a47;")
 
     content_panels = list()
 
     # This is a dictionary that lets us figure out which panel to present based on which button is pressed.
     menu_panel = None
 
-    # gss = gui_sub_section(f"background-color: #00043d5d;")
+    # gss = gui_sub_section(f"background-color: #3139af;")
 
     for m in sorted_menu_labels:
 

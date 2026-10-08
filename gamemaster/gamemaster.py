@@ -259,7 +259,7 @@ def gm_get_origins_sides_roles() -> dict:
                 role_set.add(_r.strip() + " ")
         else:
             key = ship.get("key")
-            print(f"{key} doesn't have a role specified in shipData...")
+            # print(f"{key} doesn't have a role specified in shipData...")
 
     origins_sides_roles = {
         "origins": origin_set,
@@ -396,7 +396,7 @@ def gm_ship_spawn_select_template(item):
     # with gui_sub_section(style="col-width: 30px;"):
     #     gui_ship(f"$type:{art};angle:45;")
     with gui_sub_section("padding: 2px;"):
-        gui_row("row-height:1em;")
+        gui_row("row-height:1em; border: 1px,1px,1px,1px; border-color: #3139af; background-color: #000444;")
         gui_text(f"$text:{name};justify: left;font:gui-2;color:#bbb;", "col-width: content;")
         # gui_row("row-height: 1em;")
         gui_blank()

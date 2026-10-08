@@ -213,7 +213,32 @@ type: gm_menu/fleets
 icon_index: 105
 icon_color: "blue"
 priority: 30 # Smaller number is higher priority
+prefab_type: prefab/fleet/raider
+type_name: Fleet
+settings:
+    Main:
+        Name: 'gui_input("$text:;desc:Fleet Name",var="FLEET_NAME")'
+        Side:
+        Origin:
+        Fleet Difficulty: 'gui_drop_down("$text:4;list:1,2,3,4,5,6,7,8,9,10,11;",var="FLEET_DIFF")'
+variables:
+    name: FLEET_NAME
+    ship_roles: FLEET_SIDE
+    race: FLEET_ORIGIN
+    fleet_difficulty: FLEET_DIFF
 ```
+    data = gm_get_origins_sides_roles()
+    origins = data.get("origins")
+    origins = sorted(origins, key=str.casefold)
+    origins_str = ",".join(origins)
+    settings["Main"]["Origin"] = f"gui_drop_down('$text:{origins[0]};list:{origins_str};',var='FLEET_ORIGIN')"
+
+    side_list = list(side_keys_set())
+    side_str = ",".join(side_list)
+    # print(side_list)
+    settings["Main"]["Side"] = f"gui_drop_down('$text:{side_list[0]};list:{side_str};',var='FLEET_SIDE')"
+    jump gm_menu_reusable_spawn_logic
+
 
     data = gm_get_origins_sides_roles()
     origins = data.get("origins")
@@ -257,71 +282,50 @@ priority: 30 # Smaller number is higher priority
     yield success
 #endregion
 
-#region Station Spawning
-=== gm_menu_stations
-metadata: ```
+=== gm_menu_spawn_stations
+metadata: ``` yaml
 type: gm_menu/station
-icon_index: Station
+icon_index: 114
 icon_color: white
 priority: 40
+prefab_type: prefab/npc/station
+type_name: Station
+settings:
+    Main:
+        Name: 'gui_input("$text:;desc:Station Name",var="STATION_NAME")'
+        Side:
+variables:
+    name: STATION_NAME
+    side_value: STATION_SIDE
 ```
-    with gui_sub_section():
-        gui_row("row-height: 1.5em;")
-        gui_text("Station Spawn Settings")
-        gui_row("row-height: 0.5em; background-color: #122048;")
-        gui_blank()
+    side_list = list(side_keys_set())
+    side_str = ",".join(side_list)
+    settings["Main"]["Side"] = f"gui_drop_down('$text:{side_list[0]};list:{side_str};',var='STATION_SIDE')"
+    jump gm_menu_reusable_spawn_logic
 
-        gui_row("row-height: min-content;")
-        gui_text("$text:Spawn Side:;justify:center;")
-        station_spawn_side_dropdown = gui_drop_down("$text:Allied;list:Hostile,Allied,Neutral,Origin;")
-
-        gui_row("row-height: 1em;")
-        gui_text("$text:")
-
-        gui_row("row-height: 1.5em;")
-        gui_text("$text:Station Type:;","col-width: content;")
-
-        station_prefabs = labels_get_type("prefab/npc/station")
-
-        gui_row()
-        station_type_list = gui_list(station_prefabs, select=True)
-        with station_type_list as prefab:
-            display_text = prefab.get_inventory_value("display_text")
-            if display_text is None:
-                display_text = prefab.get_inventory_value("type").replace("prefab/npc/station/","")
-            gui_text(f"$text:{display_text};","background-color: #123123")
-        station_type_list.set_selected_index(0)
-
-        gui_row("row-height: 1.5em;")
-        station_name_input = gui_input("$text:;desc:Station Name;")
-        
-        gui_row("row-height: 1.5em;")
-        spawn_station_button = gui_button("$text:Spawn Station")
-
-        on gui_message(spawn_station_button):
-
-            side = station_spawn_side_dropdown.value
-            if side == "Hostile":
-                side = "raider"
-            elif side == "Allied":
-                side = "tsn"
-            elif side == "Origin":
-                side = race
-            else:
-                side = "civ"
-
-            gm = sbs.get_ship_of_client(client_id)
-            pos = gamemaster_get_pos(gm)
-            size = gamemaster_get_size(gm)
-            lbl = station_type_list.listbox.value
-            station_name = station_name_input.value
-            # Will use the default "DS X" if None
-            if station_name == "":
-                station_name = None
-            data={"START_X":pos.x,"START_Y":pos.y,"START_Z":pos.z,"name":station_name, "side_value":side}
-            prefab_spawn(lbl, data=data)
-    yield success
 #endregion
+
+=== gm_menu_spawn_turrets
+metadata: ``` yaml
+type: gm_menu/station/turret
+icon_index: 93
+icon_color: white
+priority: 200
+prefab_type: prefab/turret
+type_name: Turret
+settings:
+    Main:
+        Name: 'gui_input("$text:;desc:Turret Name",var="TURRET_NAME")'
+        Side:
+variables:
+    name: TURRET_NAME
+    side_value: TURRET_SIDE
+```
+    yield fail if not lm_turrets_enabled()
+    side_list = list(side_keys_set())
+    side_str = ",".join(side_list)
+    settings["Main"]["Side"] = f"gui_drop_down('$text:{side_list[0]};list:{side_str};',var='TURRET_SIDE')"
+    jump gm_menu_reusable_spawn_logic
 
 
 
@@ -457,6 +461,41 @@ variables:
 ```
     jump gm_menu_reusable_spawn_logic
 
+# TODO: Implement mine and deployable spawns
+# === gm_menu_spawn_mines
+# metadata: ```
+# type: gm_menu/deployable
+# icon_index: 29
+# icon_color: "#494948"
+# priority: 84
+# prefab_type: prefab/deployable/minefield
+# type_name: Minefield
+# settings:
+#     Main:
+#         Name: 'gui_input("$text:;desc:Minefield Name",var="MINEFIELD_NAME")'
+#         Density: 'gui_int_slider("low:0.1;high:10;text:float;",var="MF_DENSITY")'
+# variables:
+#     name: MINEFIELD_NAME
+#     density_scale: MF_DENSITY
+#     use_gm_size: true
+# ```
+#     jump gm_menu_reusable_spawn_logic
+
+# === gm_menu_spawn_deployables
+# metadata: ```
+# type: gm_menu/deployable/other
+# icon_index: 126
+# icon_color: "#494948"
+# priority: 84
+# prefab_type: prefab/deployable
+# type_name: Deployable
+# settings:
+#     Main:
+#         Name: 'gui_input("$text:;desc:Deployable Name",var="DEPLOYABLE_NAME")'
+# variables:
+#     name: DEPLOYABLE_NAME
+# ```
+#     jump gm_menu_reusable_spawn_logic
 
 #region Reusable Spawn Logic
 
@@ -465,7 +504,7 @@ variables:
 " The `settings` and `variables` values are critical. 
 " `settings` defines a property_list_box that incorporates gui layout items into the UI. 
 " `variables` tells the spawn logic which layout item should be used for required metadata keys in the prefab (e.g. radius for planets)
-" `extra_roles` is a comma-separated list of roles that should be added to any object spawned using this logic. This can be used to do other, custom stuff when these objects are spawned.
+" `extra_roles` is a comma-separated list of roles that should be added to any object spawned using this logic. This can be used to do other, custom stuff when these objects are spawned. 
 " Position (START_X, etc) and size (SIZE_X, etc) are included by default, even if they are not used.
 " All other metadata keys must be specified in `variables`. It's up to the user to determine what keys are required for any given label type. 
     # metadata: ```
@@ -488,7 +527,7 @@ variables:
         print(type_name)
         yield fail
     else:
-        # TODO: Not sure why, but `prefab_type` wasn't being converted to a variable as expected.
+        # TODO: Not sure why, but `prefab_type` wasn't being converted to a variable as expected. This resolves that issue, though it really shouldn't be necessary. 
         prefab_type = mast_task.get_inventory_value("prefab_type")
 
     with gui_sub_section():
@@ -496,11 +535,12 @@ variables:
         gui_row("row-height: content;")
         listbox_tag = f"GM_GLB_SPAWN_{prefab_type}"
         # print(listbox_tag)
-        lb = gui_property_list_box_stacked(f"{type_name} Settings", listbox_tag)
+        # Not `lb`: that name is shared with the ships panel, whose `on change` handlers still target it.
+        gm_menu_reusable_spawn_logic_lb = gui_property_list_box_stacked(f"{type_name} Settings", listbox_tag)
         gui_properties_set(settings, listbox_tag)
 
         gui_row("row-height: 1.5em;")
-        gui_text("$text:Shape:;","col-width: content;")
+        gui_text("$text:Prefab:;","col-width: content;")
 
         generic_prefabs = labels_get_type(prefab_type)
 
@@ -525,6 +565,7 @@ variables:
 
         # We have to pass explicit "variables" values to the button, or it all gets messed up
         # with other panels' spawn logic
+        # Same for the listbox and prefab type/name
         spawn_obj_button = gui_button(f"$text:Spawn {type_name}", data={"variables": variables, "listbox":prefab_list.listbox, "prefab_type":prefab_type})
 
         on gui_message(spawn_obj_button):
@@ -541,6 +582,7 @@ variables:
             name = ""
             # Now we USE the variables saved on the button
             for prefab_var in button_variables.keys():
+                # use_gm_size is specifically excluded, since it's only used to set the size variables, which is already done at this point. 
                 if prefab_var in "use_gm_size":
                     continue
                 layout_item_var = button_variables.get(prefab_var)
@@ -552,6 +594,8 @@ variables:
                     print(f"Key: {prefab_var}")
                     print(f"Value (should be a string!): {layout_item_var}")
                     continue
+
+                # Add the variables to the data
                 liv = gui_get_variable(layout_item_var)
                 if liv is not None:
                     data[prefab_var] = liv
@@ -722,7 +766,7 @@ priority: 40 # Smaller number is higher priority
             _from = from_list_box.listbox.value
             if _from is None:
                 yield fail
-            # send_comms_message_to_player_ship(player_ship_select_.value, _from, "",title,"blue",message,"blue")
+            # send_comms_message_to_player_ship(player_ship_select_.value, _from, "",title,"blue",message,"blue") 
             msg = gm_in.value
             to = player_ship_select_.get_selected()
             print(f"Sending msg to: {to}")
