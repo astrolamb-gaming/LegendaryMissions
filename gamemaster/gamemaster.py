@@ -1,3 +1,4 @@
+from sbs_utils.procedural.roles import has_role
 from sbs_utils.mast.mast_globals import debug_print, MastGlobals
 from sbs_utils.procedural.style import apply_control_styles
 from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
@@ -705,6 +706,199 @@ def gm_selected_object_details(gm_id):
     lines.append(f"Current special abilities: {_gm_format_npc_abilities(obj_id, obj)}")
     lines.append(f"Current roles: {_gm_format_roles(obj)}")
     return "^".join(lines)
+
+class GmDetailSection:
+    """A header row plus a collapsible body row; `visible` (by object type) and `collapsed` (by user) are independent."""
+
+    def __init__(self, header_row, body_row):
+        self.header_row = header_row
+        self.body_row = body_row
+        self.visible = True
+        self.collapsed = False
+        self._apply()
+
+    def _apply(self):
+        self.header_row.show(self.visible)
+        self.body_row.show(self.visible and not self.collapsed)
+
+    def show(self, visible):
+        self.visible = bool(visible)
+        self._apply()
+
+    def toggle(self):
+        self.collapsed = not self.collapsed
+        self._apply()
+
+
+class GmSelectionDetails:
+    """Fills the selected-object details panel; widgets are registered by the MAST layout code."""
+
+    def __init__(self, gm_id):
+        self.gm_id = gm_id
+        self.sections = {}
+        self.texts = {}
+        self.shields = []
+        self.systems = []
+        self.armor = None
+        self.hull = None
+
+    # --- registration (called while the layout is built) ---
+    def add_section(self, key, header_row, body_row):
+        section = GmDetailSection(header_row, body_row)
+        self.sections[key] = section
+        return section
+
+    def add_text(self, key, widget):
+        self.texts[key] = widget
+
+    def add_gauge(self, key, gauge):
+        """key: shield and system pool in order; armor and hull are single gauges."""
+        if key == "shield":
+            self.shields.append(gauge)
+        elif key == "system":
+            self.systems.append(gauge)
+        else:
+            setattr(self, key, gauge)
+
+    # --- data gathering ---
+    @staticmethod
+    def _num(value):
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _shield_values(self, obj_id):
+        """[(label, cur, max)] for each shield arc."""
+        count = int(self._num(get_data_set_value(obj_id, "shield_count", 0)))
+        return [
+            (f"Shield {i + 1}",
+             self._num(get_data_set_value(obj_id, "shield_val", i)),
+             self._num(get_data_set_value(obj_id, "shield_max_val", i)))
+            for i in range(min(count, len(self.shields)))
+        ]
+
+    def _system_values(self, obj_id):
+        """[(label, damage, max_damage)] for each damageable system (damage grows)."""
+        rows = []
+        seen = set()
+        for i in range(30):
+            label = get_data_set_value(obj_id, "eng_control_label", i)
+            if not label:
+                continue
+            idx = int(get_data_set_value(obj_id, "eng_control_type_index", i) or i)
+            if idx in seen:
+                continue
+            seen.add(idx)
+            rows.append((str(label), self._num(get_data_set_value(obj_id, "system_damage", idx)),
+                         self._num(get_data_set_value(obj_id, "system_max_damage", idx))))
+        if not rows:
+            for idx, name in _SYSTEM_INDEX_NAMES.items():
+                mx = self._num(get_data_set_value(obj_id, "system_max_damage", idx))
+                if mx > 0:
+                    rows.append((name, self._num(get_data_set_value(obj_id, "system_damage", idx)), mx))
+        return rows[:len(self.systems)]
+
+    def _npc_hull_values(self, obj_id, ship_data):
+        """(current, max) hull points, or None when the hull is unknown."""
+        base = ship_data.get("hullpoints", None)
+        total_max = sum(self._num(get_data_set_value(obj_id, "system_max_damage", i)) for i in range(4))
+        total_dmg = sum(self._num(get_data_set_value(obj_id, "system_damage", i)) for i in range(4))
+        if base is not None:
+            base = float(base)
+            if total_max > 0:
+                return base * max(0.0, min(1.0, 1.0 - total_dmg / total_max)), base
+            return base, base
+        if total_max > 0:
+            return max(0.0, total_max - total_dmg), total_max
+        return None
+
+    # --- widget updates ---
+    def _set_text(self, key, label, value):
+        self.texts[key].update("text:" + gui_text_escape(f"{label}: {value}") + ";")
+
+    @staticmethod
+    def _set_gauges(gauges, rows):
+        """Fill a pool of gauges from (label, value, max) rows; hide the spare ones."""
+        for i, g in enumerate(gauges):
+            if i < len(rows):
+                label, value, mx = rows[i]
+                g.update(value=value, max=mx, label=label)
+                g.show(True)
+            else:
+                g.show(False)
+
+    def refresh_data(self):
+        """Push the GM-selected object's data into the widgets; hide sections that do not apply."""
+        sel = get_inventory_value(self.gm_id, "gamemaster_prev_selection", None)
+        obj = to_object(sel) if sel else None
+        sections = self.sections
+
+        if obj is None:
+            for s in sections.values():
+                s.show(False)
+            sections["general"].show(True)
+            self.texts["name"].update("text:No object selected.;")
+            for k in ("id", "type", "origin", "side", "roles"):
+                self._set_text(k, k.capitalize(), "-")
+            return
+
+        obj_id = obj.id
+        ship_type, origin, side, ship_data = _gm_get_ship_data_fields(obj)
+        is_station = has_role(obj_id, "station")
+        is_player = has_role(obj_id,"__player__")
+        is_terrain = obj.is_terrain
+        is_npc = has_role(obj_id,"__terrain__")
+        is_monster = has_role(obj_id, "monster")
+        kind = "Terrain" if is_terrain else "Station" if is_station else "Player Ship" if is_player else "NPC Ship"
+
+        self.texts["name"].update("text:" + gui_text_escape(str(obj.name)) + ";font:gui-2;")
+        self._set_text("id", "ID", obj_id)
+        self._set_text("type", f"Type ({kind})", ship_type)
+        self._set_text("origin", "Origin", origin)
+        self._set_text("side", "Side", side)
+        self._set_text("roles", "Roles", _gm_format_roles(obj))
+
+        shield_rows = [] if is_terrain else self._shield_values(obj_id)
+        self._set_gauges(self.shields, shield_rows)
+
+        has_armor = False
+        if is_station:
+            armor_max = self._num(get_data_set_value(obj_id, "armorMax", 0))
+            has_armor = armor_max > 0
+            if has_armor:
+                self.armor.update(value=self._num(get_data_set_value(obj_id, "armor", 0)), max=armor_max, label="Armor")
+        has_hull = False
+        if is_npc:
+            hull = self._npc_hull_values(obj_id, ship_data)
+            has_hull = hull is not None
+            if has_hull:
+                self.hull.update(value=hull[0], max=hull[1], label="Hull")
+        self.armor.show(has_armor)
+        self.hull.show(has_hull)
+        sections["defense"].show(bool(shield_rows) or has_armor or has_hull)
+
+        systems = self._system_values(obj_id) if is_player else []
+        # Damage grows, so the bar shows what is left of each system.
+        self._set_gauges(self.systems, [(n, max(0.0, mx - d), mx) for n, d, mx in systems])
+        sections["systems"].show(bool(systems))
+
+        sections["fleet"].show(is_npc)
+        if is_npc:
+            fleet_name, flagship = _gm_format_fleet_info(obj_id)
+            self._set_text("fleet", "Fleet", fleet_name)
+            self._set_text("flagship", "Flagship", flagship)
+
+        sections["extras"].show(is_npc or is_player)
+        self._set_text("abilities", "Abilities", _gm_format_npc_abilities(obj_id, obj) if is_npc else "n/a")
+        self._set_text("upgrades", "Upgrades", _gm_format_player_upgrades(obj_id) if is_player else "n/a")
+        sections["general"].show(True)
+
+
+def gm_selection_details_build(gm_id):
+    """Builder exposed to MAST (which only sees functions); the handler is kept with gui_set_variable."""
+    return GmSelectionDetails(gm_id)
+
 
 def get_beam_blob_keys():
     return [

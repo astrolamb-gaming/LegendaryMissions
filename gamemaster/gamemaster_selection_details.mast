@@ -9,17 +9,129 @@ icon_index: 118
 icon_color: "#00ffd5"
 priority: 10 # Smaller number is higher priority
 ```
-    gui_row("row-height: 1.6em;")
-    gui_text("$text:Selected Object Details;font:gui-2;justify:left;")
-    gui_row()
-    selected_details = gui_text_area("Select an object in science or weapons to view details.")
-
+    # gui_row("row-height: 1.6em;")
+    # gui_text("$text:Selected Object Details;font:gui-2;justify:left;")
     gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
+    # The handler owns every details widget and fills them in refresh().
+    handler = gm_selection_details_build(gm)
+    section_row_height = "row-height: content;"
 
+    gui_row("row-height: 200;")
+    with gui_sub_section() as selected_gss:
+        # --- General (always shown) ---
+        gui_row("row-height: 1.5em;")
+        gui_text("$text:Selected Object: ;","col-width: content; justify: left;")
+        gui_blank()
+        handler.add_text("name", gui_text("$text:Select an object in science or weapons to view details.;font:gui-2;","col-width: content; justify: right;"))
+        gen_hdr_row = gui_row("row-height: 1.3em;")
+        gen_header = gui_text("$text:General  ;font:gui-1;color:#0fc;", "click_background:#0fc2;click_text:;")
+        general_body = gui_row(section_row_height)
+        with gui_sub_section():
+            gui_row("row-height: 1.2em;")
+            handler.add_text("id", gui_text("$text:ID: -;"))
+            gui_row("row-height: 1.2em;")
+            handler.add_text("type", gui_text("$text:Type: -;"))
+            gui_row("row-height: 1.2em;")
+            handler.add_text("origin", gui_text("$text:Origin: -;"))
+            gui_row("row-height: 1.2em;")
+            handler.add_text("side", gui_text("$text:Side: -;"))
+            gui_row("row-height: 3.2em;")
+            handler.add_text("roles", gui_text("$text:Roles: -;"))
+            gui_row("row-height: 1.2em;")
+            gui_text(" ")
+        general = handler.add_section("general", gen_hdr_row, general_body)
+        gen_header.data = {"section": general, "parent": selected_gss}
+        gui_message(gen_header, "gm_toggle_detail_section")
+
+        # --- Defense: shields, armor, hull ---
+        def_hdr_row = gui_row("row-height: 1.3em;")
+        def_header = gui_text("$text:Defense  ;font:gui-1;color:#0fc;", "click_background:#0fc2;click_text:;")
+        defense_body = gui_row(section_row_height)
+        with gui_sub_section():
+            for i in range(4):
+                gui_row("row-height: 1.6em;")
+                handler.add_gauge("shield", gui_gauge(0, 1, "", show="frac"))
+            gui_row("row-height: 1.6em;")
+            handler.add_gauge("armor", gui_gauge(0, 1, "Armor", show="frac"))
+            gui_row("row-height: 1.6em;")
+            handler.add_gauge("hull", gui_gauge(0, 1, "Hull", show="frac"))
+            gui_row("row-height: 1.2em;")
+            gui_text(" ")
+        defense = handler.add_section("defense", def_hdr_row, defense_body)
+        def_header.data = {"section": defense, "parent": selected_gss}
+        gui_message(def_header, "gm_toggle_detail_section")
+
+        # --- Systems (player ships): bar shows the health left in each system ---
+        sys_hdr_row = gui_row("row-height: 1.3em;")
+        sys_header = gui_text("$text:Systems  ;font:gui-1;color:#0fc;", "click_background:#0fc2; click_text:;")
+        systems_body = gui_row(section_row_height)
+        with gui_sub_section():
+            for i in range(8):
+                gui_row("row-height: 1.6em;")
+                handler.add_gauge("system", gui_gauge(0, 1, "", show="frac"))
+                gui_row("row-height: 1.2em;")
+                gui_text(" ")
+        systems = handler.add_section("systems", sys_hdr_row, systems_body)
+        sys_header.data = {"section": systems, "parent": selected_gss}
+        gui_message(sys_header, "gm_toggle_detail_section")
+
+        # --- Fleet (NPC ships) ---
+        fleet_hdr_row = gui_row("row-height: 1.3em;")
+        fleet_header = gui_text("$text:Fleet  ;font:gui-1;color:#0fc;", "click_background:#0fc2;click_text:;")
+        fleet_body = gui_row(section_row_height)
+        with gui_sub_section():
+            gui_row("row-height: 1.2em;")
+            handler.add_text("fleet", gui_text("$text:Fleet: none;"))
+            gui_row("row-height: 1.2em;")
+            handler.add_text("flagship", gui_text("$text:Flagship: none;"))
+            gui_row("row-height: 1.2em;")
+            gui_text(" ")
+        fleet = handler.add_section("fleet", fleet_hdr_row, fleet_body)
+        fleet_header.data = {"section": fleet, "parent": selected_gss}
+        gui_message(fleet_header, "gm_toggle_detail_section")
+
+        # --- Abilities and upgrades ---
+        extras_hdr_row = gui_row("row-height: 1.3em;")
+        extras_header = gui_text("$text:Abilities and Upgrades  ;font:gui-1;color:#0fc;", "click_background:#0fc2;click_text:;")
+        extras_body = gui_row(section_row_height)
+        with gui_sub_section():
+            gui_row("row-height: 2.4em;")
+            handler.add_text("abilities", gui_text("$text:Abilities: n/a;"))
+            gui_row("row-height: 2.4em;")
+            handler.add_text("upgrades", gui_text("$text:Upgrades: n/a;"))
+            gui_row("row-height: 1.2em;")
+            gui_text(" ")
+        extras = handler.add_section("extras", extras_hdr_row, extras_body)
+        extras_header.data = {"section": extras, "parent": selected_gss}
+        gui_message(extras_header, "gm_toggle_detail_section")
+
+        handler.refresh_data()
+        gui_set_variable("gm_details_handler", handler)
+
+    # Refresh right away on a new selection; the sub task keeps values live every second.
     on change get_inventory_value(gm, "gamemaster_prev_selection"):
-        # if not selected_details.is_hidden:
-        selected_details_text = gm_selected_object_details(gm)
-        selected_details.update(selected_details_text)
+        # Handler locals can be shadowed by widgets, so re-fetch the handler.
+        gui_get_variable("gm_details_handler").refresh_data()
+    gui_sub_task_schedule(gm_selected_details_update)
+    yield success
+
+=== gm_selected_details_update
+    details_handler = gui_get_variable("gm_details_handler")
+    yield fail if details_handler is None
+    details_handler.refresh_data()
+    await delay_sim(1)
+    jump gm_selected_details_update
+
+=== gm_toggle_detail_section
+" Collapse or expand a section of the selected-object details.
+    default __ITEM__ = None
+    yield fail if __ITEM__ is None
+    section = __ITEM__.data.get("section")
+    yield fail if section is None
+    section.toggle()
+    parent = __ITEM__.data.get("parent")
+    if parent is not None:
+        gui_represent(parent)
     yield success
 
 #region Selected ship - Beams
