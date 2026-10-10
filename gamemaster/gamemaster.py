@@ -840,7 +840,7 @@ class GmSelectionDetails:
                 s.show(False)
             sections["general"].show(True)
             self.texts["name"].update("text:No object selected.;")
-            for k in ("id", "type", "origin", "side", "roles"):
+            for k in ("id", "type", "origin", "side"):
                 self._set_text(k, k.capitalize(), "-")
             return
 
@@ -858,7 +858,7 @@ class GmSelectionDetails:
         self._set_text("type", f"Type ({kind})", ship_type)
         self._set_text("origin", "Origin", origin)
         self._set_text("side", "Side", side)
-        self._set_text("roles", "Roles", _gm_format_roles(obj))
+        # self._set_text("roles", "Roles", _gm_format_roles(obj))
 
         shield_rows = [] if is_terrain else self._shield_values(obj_id)
         self._set_gauges(self.shields, shield_rows)

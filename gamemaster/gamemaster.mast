@@ -702,90 +702,6 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
     jump gamemaster_side_relations
 
 
-== gm_build_spawn_menu
-    items = []
-    gui_list_box(items,"")
-
-
-== gm_spawn_ship
-metadata: ```
-buttons: 
-```
-    print(f"Spawning Ship: Nothing yet")
-    # gui_button("Hello 1")
-    # gui_button("Hello 2")
-    if buttons is None:
-        print(f"Buttons is None")
-        yield fail
-    print(f"buttons: {buttons}")
-    signal_emit("update_glb",{"update_contents":["hi","this","is","amazingly","working"]})
-    # for b in buttons:
-    #     gui_button(b)
-    #     gui_row()
-    # buildButtons("Test", buttons)
-
-
-
-=== test_buttons
-    comms_broadcast(0, "BUTTON PRESSED!")
-    ->END
-
-# ==== update_gm_stats
-#     jump END
-
-    # await delay_sim(seconds=10)
-
-    # gm_side = get_inventory_value(client_id, "gamemaster_cur_side",None)
-    # if gm_side is None:
-    #     player = role("__player__").pop()
-    #     side = to_side_id(player)
-    #     gm_side = get_inventory_value(side, "side_key", "tsn")
-    #     set_inventory_value(client_id, "gamemaster_cur_side", gm_side)
-    # # print(f"{gm_side}")
-    # r = side_enemy_members_set(gm_side)
-    # count=len(r)
-    # gui_update_shared("sh_raider_count", f"$text:{count};justify:left;font:gui-3;")
-
-    # if is_timer_set(SHARED, "time_limit") and get_inventory_value(client_id, "gm_show_stats", False):
-    #     t = format_time_remaining(SHARED, "time_limit")
-    #     gui_update_shared("sh_game_time",f"$text: {t};justify:left;font:gui-3;")
-
-
-    # jump update_gm_stats
-
-//spawn if has_role(SPAWNED_ID, "ship")
-    to_update = get_inventory_value(client_id, "gm_counts_list", None)
-    if to_update is not None:
-        # TODO: Finish this - need to change this to use a listbox I think
-        print("updating - to do")
-        
-
-#region GameMaster Ship Details Info Panel Stuff
-
-
-=== GM_Button_Pressed
-    # Should have these variables available:
-    # parent_category, item
-    # comms_broadcast(0, "GM Button Pressed")
-    print("GM BUtton pressed")
-    # comms_broadcast(0, f"{item}")
-    default menu = get_inventory_value(client_id, "gm_menu")
-    # comms_broadcast(0, f"{menu}")
-    ->END
-
-=== GM_Side_Selection
-    comms_broadcast(0, "GM Side Selection")
-    # comms_broadcast(0, f"{name}")
-    default menu = get_inventory_value(client_id, "gm_menu")
-    # comms_broadcast(0, f"{menu}")
-    ->END
-
-#endregion
-
-=== gm_time_setup
-    
-    ->END
-
 ==== gamemaster_move_camera_sync
     await delay_sim(3)
     do_move = do_move + 1 if do_move is not None else 0
@@ -1064,13 +980,6 @@ priority: 99
 
 //shared/signal/game_started
     start_counter(0, "Mission_Elapsed_Time")
-    set_interval(0, "gui_update_interval", "gui_update_interval_signal", 0.1) # One interval triggers all gm udpates
+    set_interval(0, "gui_update_interval", "gui_update_interval_signal", 0.2) # One interval triggers all gm udpates
     
-# //signal/gui_update_interval_signal
-#     print("update triggered")
-# //shared/signal/create_player_ships
-#     for ship in role("__player__"):
-#         set_data_set_value(ship, "eng_control_label", "Test", 1)
-#         lbl = get_data_set_value(ship, "eng_control_label", 1)
-#         print(f"Label: {lbl}")
-        
+

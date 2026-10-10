@@ -45,8 +45,8 @@ priority: 10 # Smaller number is higher priority
             handler.add_text("origin", gui_text("$text:Origin: -;"))
             gui_row("row-height: 1.2em;")
             handler.add_text("side", gui_text("$text:Side: -;"))
-            gui_row("row-height: 3.2em;")
-            handler.add_text("roles", gui_text("$text:Roles: -;"))
+            # gui_row("row-height: 3.2em;")
+            # handler.add_text("roles", gui_text("$text:Roles: -;"))
             gui_row("row-height: 1.2em;")
             gui_text(" ")
         general = handler.add_section("general", gen_hdr_row, general_body)
@@ -66,6 +66,8 @@ priority: 10 # Smaller number is higher priority
 
             # gui_row(gauge_row_height)
             # handler.add_gauge("hull", gui_gauge(0, 1, "Hull", show="frac"))
+            gui_row(gauge_row_height)
+            gui_text(" ")
 
         defense = handler.add_section("defense", def_hdr_row, defense_body)
         def_header.data = {"section": defense, "parent": selected_gss}
@@ -79,10 +81,13 @@ priority: 10 # Smaller number is higher priority
             gui_row(f"border-color: #123456;border:1px,1px,1px,1px;background: #203d5aa0;{gauge_row_height};")
             handler.add_gauge("hull", gui_gauge(0, 1, "Hull", show="frac"))
             for i in range(8):
-                gui_row("row-height: 1.6em;")
+                gui_row(gauge_row_height)
                 handler.add_gauge("system", gui_gauge(0, 1, "", show="frac"))
-            gui_row("row-height: 1.2em;")
+
+
+            gui_row(gauge_row_height)
             gui_text(" ")
+        
         systems = handler.add_section("systems", sys_hdr_row, systems_body)
         sys_header.data = {"section": systems, "parent": selected_gss}
         gui_message(sys_header, "gm_toggle_detail_section")
@@ -442,4 +447,137 @@ ship_id:
     # fleet = fleet_spawn(pos, role_list)
     # fleet.side = to_object(old_fleet).side
     fleet_add(fleet, ship_id)
+
+
+=== gm_menu_upgrades_and_abilities
+metadata: ```
+type: gm_menu/selected/upgrades
+icon_index: 74
+priority: 400
+```
+    gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
+    selected = get_inventory_value(gm, "gamemaster_prev_selection", None)
+
+
+
+=== gm_menu_side_manager
+metadata: ```
+type: gm_menu/sides
+icon_index: 23
+priority: 86
+```
+    gm = get_inventory_value(client_id, "GAMEMASTER_COMBOT", None)
+    side_ids = sides_set()
+    side_names = set()
+    for s in side_ids:
+        side_names.add(side_display_name(s))
+    sides = sorted(list(side_names))
+    relations = list(("Allies", "Neutral", "Enemies"))
+    relations_value = list((sbs.DIPLOMACY.ALLIED, sbs.DIPLOMACY.NEUTRAL, sbs.DIPLOMACY.HOSTILE, sbs.DIPLOMACY.UNKNOWN))
+
+    text_height = "row-height:1.3em;"
+    diplomacy = gui_row("row-height: 1.3em; click_text:;")
+    gui_text(" - Diplomacy")
+    gui_row()
+    dip_content = gui_sub_section()
+    with dip_content:
+        gui_text("Select a side:")
+        gui_row()
+        side_lb = gui_list_box(sides,"",select=True)
+        side_lb.set_selected_index(0)
+        gui_row("row-height: 1.3em;")
+        gui_text("Select a side:")
+        gui_row()
+        o_side_lb = gui_list_box(sides,"",select=True)
+        o_side_lb.set_selected_index(0)
+        gui_row("row-height: content;")
+        gui_text("Current diplomacy status:")
+        cur = gui_text("Allied")
+        gui_set_variable("current_diplo_status_text",cur)
+
+        data={"s1_glb":side_lb,"s2_glb":o_side_lb,"cur_dip":cur}
+
+        gui_row(text_height)
+        allies = gui_button("Set as Allies")
+        allies.data= data
+        gui_row(text_height)
+        neutral = gui_button("Set as Neutral")
+        neutral.data=data
+        gui_row(text_height)
+        hostile = gui_button("Set as Hostile")
+        hostile.data=data
+        gui_row(text_height)
+        unknown = gui_button("Set as Unknown")
+        unknown.data=data
+        on gui_message(allies):
+            s1 = __ITEM__.data["s1_glb"].value
+            s2 = __ITEM__.data["s2_glb"].value
+            cur = __ITEM__.data["cur_dip"]
+            if s1==s2:
+                cur.value = "$text:Same Side"
+                ->END
+            cur.update("$text:Allied")
+            side_set_relations(s1,s2,sbs.DIPLOMACY.ALLIED)
+        on gui_message(neutral):
+            s1 = __ITEM__.data["s1_glb"].value
+            s2 = __ITEM__.data["s2_glb"].value
+            cur = __ITEM__.data["cur_dip"]
+            if s1==s2:
+                cur.value = "$text:Same Side"
+                ->END
+            cur.update("$text:Neutral")
+            side_set_relations(s1,s2,sbs.DIPLOMACY.NEUTRAL)
+        on gui_message(hostile):
+            s1 = __ITEM__.data["s1_glb"].value
+            s2 = __ITEM__.data["s2_glb"].value
+            cur = __ITEM__.data["cur_dip"]
+            if s1==s2:
+                cur.value = "$text:Same Side"
+                ->END
+            cur.update("$text:Hostile")
+            side_set_relations(s1,s2,sbs.DIPLOMACY.HOSTILE)
+        on gui_message(unknown):
+            s1 = __ITEM__.data["s1_glb"].value
+            s2 = __ITEM__.data["s2_glb"].value
+            cur = __ITEM__.data["cur_dip"]
+            if s1==s2:
+                cur.value = "$text:Same Side"
+                ->END
+            cur.update("$text:Unknown")
+            side_set_relations(s1,s2,sbs.DIPLOMACY.UNKNOWN)
+        on change side_lb.value:
+            s1 = to_side_id(side_lb.value)
+            s2 = to_side_id(o_side_lb.value)
+            cur = gui_get_variable("current_diplo_status_text")
+            if s1 == s2:
+                cur.value = "Same Side"
+                ->END
+            rel = side_get_relations(s1,s2)
+            if rel == sbs.DIPLOMACY.ALLIED:
+                cur.value = "Allied"
+            elif rel == sbs.DIPLOMACY.HOSTILE:
+                cur.value = "Hostile"
+            elif rel == sbs.DIPLOMACY.NEUTRAL:
+                cur.value = "Neutral"
+            else:
+                cur.value = "Unknown"
+        on change o_side_lb.value:
+            s1 = to_side_id(side_lb.value)
+            s2 = to_side_id(o_side_lb.value)
+            cur = gui_get_variable("current_diplo_status_text")
+            if s1 == s2:
+                cur.value = "Same Side"
+                ->END
+            rel = side_get_relations(s1,s2)
+            if rel == sbs.DIPLOMACY.ALLIED:
+                cur.value = "Allied"
+            elif rel == sbs.DIPLOMACY.HOSTILE:
+                cur.value = "Hostile"
+            elif rel == sbs.DIPLOMACY.NEUTRAL:
+                cur.value = "Neutral"
+            else:
+                cur.value = "Unknown"
+
+    yield success
+
 
