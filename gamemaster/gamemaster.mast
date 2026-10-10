@@ -77,7 +77,7 @@ default GM_SIDEBAR_SELECTED_SUBMENU_INDEX = {}
         #@link extra_scan_source: All the sources which provide scan information to this object
         link(cambot_id,"extra_scan_source" ,stations_friendly)
 
-        set_interval(client_id, "gui_update_interval", "gui_update_interval_signal", 1) # One for each GM, to simplify interval signal usage
+    set_data_set_value(cambot,"selectable",0)
     
     last_sci = cambot_id
     #
@@ -1064,8 +1064,10 @@ priority: 99
 
 //shared/signal/game_started
     start_counter(0, "Mission_Elapsed_Time")
+    set_interval(0, "gui_update_interval", "gui_update_interval_signal", 0.1) # One interval triggers all gm udpates
     
-
+# //signal/gui_update_interval_signal
+#     print("update triggered")
 # //shared/signal/create_player_ships
 #     for ship in role("__player__"):
 #         set_data_set_value(ship, "eng_control_label", "Test", 1)

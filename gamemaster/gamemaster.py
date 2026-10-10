@@ -1,4 +1,4 @@
-from sbs_utils.procedural.roles import has_role
+from sbs_utils.procedural.roles import has_role, has_roles
 from sbs_utils.mast.mast_globals import debug_print, MastGlobals
 from sbs_utils.procedural.style import apply_control_styles
 from sbs_utils.procedural.torpedoes import torpedo_get_available_types_for_ship, torpedo_get_count_for_ship, torp_get_attribute_value
@@ -739,7 +739,6 @@ class GmSelectionDetails:
         self.texts = {}
         self.shields = []
         self.systems = []
-        self.armor = None
         self.hull = None
 
     # --- registration (called while the layout is built) ---
@@ -802,16 +801,18 @@ class GmSelectionDetails:
     def _npc_hull_values(self, obj_id, ship_data):
         """(current, max) hull points, or None when the hull is unknown."""
         base = ship_data.get("hullpoints", None)
-        total_max = sum(self._num(get_data_set_value(obj_id, "system_max_damage", i)) for i in range(4))
-        total_dmg = sum(self._num(get_data_set_value(obj_id, "system_damage", i)) for i in range(4))
-        if base is not None:
-            base = float(base)
-            if total_max > 0:
-                return base * max(0.0, min(1.0, 1.0 - total_dmg / total_max)), base
-            return base, base
-        if total_max > 0:
-            return max(0.0, total_max - total_dmg), total_max
-        return None
+        if base is None:
+            return None
+        total_max = 0.0
+        total_dmg = 0.0
+        for idx in range(4):
+            mx = get_data_set_value(obj_id, "system_max_damage", idx, 0)
+            cur = get_data_set_value(obj_id, "system_damage", idx, 0)
+            total_max += mx
+            total_dmg += cur
+        max_hullpoints = total_max + base
+        current_hullpoints = max_hullpoints - total_dmg
+        return current_hullpoints, max_hullpoints
 
     # --- widget updates ---
     def _set_text(self, key, label, value):
@@ -848,9 +849,9 @@ class GmSelectionDetails:
         is_station = has_role(obj_id, "station")
         is_player = has_role(obj_id,"__player__")
         is_terrain = obj.is_terrain
-        is_npc = has_role(obj_id,"__terrain__")
+        is_npc = has_roles(obj_id,"__npc__,ship")
         is_monster = has_role(obj_id, "monster")
-        kind = "Terrain" if is_terrain else "Station" if is_station else "Player Ship" if is_player else "NPC Ship"
+        kind = "Terrain" if is_terrain else "Monster" if is_monster else "Station" if is_station else "Player Ship" if is_player else "NPC Ship"
 
         self.texts["name"].update("text:" + gui_text_escape(str(obj.name)) + ";font:gui-2;")
         self._set_text("id", "ID", obj_id)
@@ -861,27 +862,24 @@ class GmSelectionDetails:
 
         shield_rows = [] if is_terrain else self._shield_values(obj_id)
         self._set_gauges(self.shields, shield_rows)
+        sections["defense"].show(shield_rows)
 
-        has_armor = False
+        show_hull = False
         if is_station:
+            show_hull = True
             armor_max = self._num(get_data_set_value(obj_id, "armorMax", 0))
-            has_armor = armor_max > 0
-            if has_armor:
-                self.armor.update(value=self._num(get_data_set_value(obj_id, "armor", 0)), max=armor_max, label="Armor")
-        has_hull = False
-        if is_npc:
+            self.hull.update(value=self._num(get_data_set_value(obj_id, "armor", 0)), max=armor_max, label="Armor")
+        elif is_npc:
             hull = self._npc_hull_values(obj_id, ship_data)
-            has_hull = hull is not None
-            if has_hull:
+            show_hull = hull is not None
+            if show_hull:
                 self.hull.update(value=hull[0], max=hull[1], label="Hull")
-        self.armor.show(has_armor)
-        self.hull.show(has_hull)
-        sections["defense"].show(bool(shield_rows) or has_armor or has_hull)
 
-        systems = self._system_values(obj_id) if is_player else []
+
+        systems = self._system_values(obj_id) if is_player or is_npc else []
         # Damage grows, so the bar shows what is left of each system.
         self._set_gauges(self.systems, [(n, max(0.0, mx - d), mx) for n, d, mx in systems])
-        sections["systems"].show(bool(systems))
+        sections["systems"].show(bool(systems) or show_hull)
 
         sections["fleet"].show(is_npc)
         if is_npc:
